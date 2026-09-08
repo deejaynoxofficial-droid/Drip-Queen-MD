@@ -180,7 +180,7 @@ npm --version
 ### 1️⃣ Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/DRIP-QUEEN-MD.git
+git clone https://github.com/deejaynoxofficial-droid/Drip-Queen-MD
 ```
 
 ### 2️⃣ Enter the project
