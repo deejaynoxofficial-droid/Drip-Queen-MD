@@ -148,33 +148,6 @@ DRIP-QUEEN-MD/
 │   ├── menu.js
 │   ├── search.js
 │   └── ...
-│
-├── assets/
-│   ├── logo.png
-│   └── dashboard.png
-│
-├── dashboard/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-│
-├── sessions/
-│   └── .gitkeep
-│
-├── commandLoader.js
-├── config.js
-├── dashboard.js
-├── database.js
-├── functions.js
-├── index.js
-├── menuSession.js
-├── newSession.js
-├── session.js
-├── sessionManager.js
-├── settings.json
-├── package.json
-├── .gitignore
-└── README.md
 ```
 
 ---
