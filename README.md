@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/logo.png" alt="DRIP QUEEN MD Logo" width="500"/>
+<img src="./assets/logo.png" alt="DRIP QUEEN MD Logo" width="900"/>
 
 # 👑 DRIP QUEEN MD
 
