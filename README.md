@@ -267,7 +267,7 @@ Example:
 Bot settings can be customized through:
 
 ```text
-config.js
+xxxx.js
 ```
 
 Example:
