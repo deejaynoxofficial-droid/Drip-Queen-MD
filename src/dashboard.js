@@ -532,6 +532,11 @@ function createDashboard(app) {
 
             try {
 
+                if (BOT_WORKER_URL) {
+                    const workerCommands = await workerRequest("/api/commands");
+                    return res.json(workerCommands);
+                }
+
                 const commands =
                     await getCommands();
 

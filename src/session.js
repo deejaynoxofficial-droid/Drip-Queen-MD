@@ -19,13 +19,14 @@ try {
 
 }
 
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-    fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
-} = require("@whiskeysockets/baileys");
+let baileysModule = null;
+
+async function loadBaileys() {
+    if (!baileysModule) {
+        baileysModule = await import("@whiskeysockets/baileys");
+    }
+    return baileysModule;
+}
 
 const pino = require("pino");
 
@@ -137,6 +138,14 @@ function clearReconnectTimer(userId) {
 ========================================== */
 
 async function connectSession(userId) {
+
+    const {
+        default: makeWASocket,
+        useMultiFileAuthState,
+        DisconnectReason,
+        fetchLatestBaileysVersion,
+        makeCacheableSignalKeyStore
+    } = await loadBaileys();
 
     try {
 
