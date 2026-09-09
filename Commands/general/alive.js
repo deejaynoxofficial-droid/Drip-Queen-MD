@@ -1,8 +1,8 @@
-const config = require("../config");
+const config = require("../../config");
 
 const {
 formatRuntime
-} = require("../lib/functions");
+} = require("../../lib/functions");
 
 // ==========================================
 // DRIP QUEEN MD - ALIVE COMMAND
@@ -53,7 +53,7 @@ execute: async ({
 ╰────────────────────
 
 «Drip Queen MD is active and ready! 🚀
-`;»
+`;
 
         await reply(aliveMessage);
 

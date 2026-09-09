@@ -1,16 +1,16 @@
-const config = require("../config");
+const config = require("../../config");
 
 const {
 getCommandCount
-} = require("../lib/commandLoader");
+} = require("../../src/commandLoader");
 
 const {
 getSessionStats
-} = require("../lib/sessionManager");
+} = require("../../src/session");
 
 const {
 formatRuntime
-} = require("../lib/functions");
+} = require("../../lib/functions");
 
 // ==========================================
 // DRIP QUEEN MD - BOT INFO COMMAND
@@ -75,7 +75,7 @@ execute: async ({
 ╰────────────────────
 
 «Thank you for using DRIP QUEEN MD 👑
-`;»
+`;
 
         await reply(message);
 

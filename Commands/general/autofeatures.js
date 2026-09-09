@@ -1,8 +1,8 @@
-const config = require("../config");
+const config = require("../../config");
 
 const {
     getSettings
-} = require("../lib/autoSettings");
+} = require("../../lib/autoSettings");
 
 // ==========================================
 // DRIP QUEEN MD - AUTO FEATURES DASHBOARD

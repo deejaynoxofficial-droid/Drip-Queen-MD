@@ -1,9 +1,9 @@
-const config = require("../config");
+const config = require("../../config");
 
 const {
     getSettings,
     updateSetting
-} = require("../lib/autoSettings");
+} = require("../../lib/autoSettings");
 
 // ==========================================
 // DRIP QUEEN MD - AUTO REACT COMMAND

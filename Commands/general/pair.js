@@ -73,7 +73,7 @@ module.exports = {
         try {
 
             const result =
-                await newSession.createNewSession(
+                await newSession.generatePairingCode(
                     phoneNumber
                 );
 
