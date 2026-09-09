@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/logo.png" alt="DRIP QUEEN MD Logo" width="650"/>
+<img src="./assets/logo.png" alt="DRIP QUEEN MD Logo" width="220"/>
 
 # 👑 DRIP QUEEN MD
 
@@ -148,6 +148,33 @@ DRIP-QUEEN-MD/
 │   ├── menu.js
 │   ├── search.js
 │   └── ...
+│
+├── assets/
+│   ├── logo.png
+│   └── dashboard.png
+│
+├── dashboard/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+│
+├── sessions/
+│   └── .gitkeep
+│
+├── commandLoader.js
+├── config.js
+├── dashboard.js
+├── database.js
+├── functions.js
+├── index.js
+├── menuSession.js
+├── newSession.js
+├── session.js
+├── sessionManager.js
+├── settings.json
+├── package.json
+├── .gitignore
+└── README.md
 ```
 
 ---
@@ -180,7 +207,7 @@ npm --version
 ### 1️⃣ Clone the repository
 
 ```bash
-git clone https://github.com/deejaynoxofficial-droid/Drip-Queen-MD
+git clone https://github.com/YOUR_USERNAME/DRIP-QUEEN-MD.git
 ```
 
 ### 2️⃣ Enter the project
@@ -267,7 +294,7 @@ Example:
 Bot settings can be customized through:
 
 ```text
-xxxx.js
+config.js
 ```
 
 Example:

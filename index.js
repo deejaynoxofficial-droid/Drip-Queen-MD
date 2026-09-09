@@ -1,63 +1,59 @@
-/* ==========================================
-   DRIP QUEEN MD - MAIN ENTRY FILE
-   CREATED BY NOX STAR TECH
-========================================== */
-
 require("dotenv").config();
 
-
-/* ==========================================
-   IMPORTS
-========================================== */
-
 const fs = require("fs");
-const path = require("path");
+const express = require("express");
 
 const config = require("./config");
 
-const {
-    startServer
-} = require("./server");
+
+/* ==========================================
+   SAFE REQUIRE FUNCTION
+========================================== */
+
+function safeRequire(modulePath) {
+
+    try {
+
+        return require(modulePath);
+
+    } catch (error) {
+
+        console.error(
+            `[INDEX] Failed to load ${modulePath}:`,
+            error.message
+        );
+
+        return null;
+
+    }
+
+}
 
 
 /* ==========================================
-   GLOBAL BOT STATE
+   LOAD CORE MODULES
 ========================================== */
 
-global.botStatus = "starting";
+const createDashboard =
+    safeRequire("./src/dashboard");
 
+const commandLoader =
+    safeRequire("./src/commandLoader");
 
-global.botConnections =
-    global.botConnections || new Map();
+const sessionManager =
+    safeRequire("./src/session");
 
-
-global.autoFeatures =
-    global.autoFeatures || {
-
-        antilink: false,
-
-        antidelete: false,
-
-        autoreact: false,
-
-        autoreply: false,
-
-        autotyping: false,
-
-        autorecording: false,
-
-        welcome: false,
-
-        goodbye: false
-
-    };
+const database =
+    safeRequire("./lib/database");
 
 
 /* ==========================================
    CREATE REQUIRED DIRECTORIES
 ========================================== */
 
-const directories = [
+function ensureDirectories() {
+
+    const directories = [
 
     config.SESSIONS_PATH,
 
@@ -67,19 +63,20 @@ const directories = [
 
     config.LOGS_PATH,
 
-    config.PUBLIC_PATH
+    config.COMMANDS_PATH,
+
+    config.LIB_PATH,
+
+    config.SRC_PATH
 
 ];
 
 
-function createDirectories() {
+    for (const directory of directories) {
 
-    directories.forEach(
-        directory => {
+        try {
 
-            if (
-                !fs.existsSync(directory)
-            ) {
+            if (!fs.existsSync(directory)) {
 
                 fs.mkdirSync(
                     directory,
@@ -89,293 +86,382 @@ function createDirectories() {
                 );
 
                 console.log(
-                    `📁 Created: ${directory}`
+                    `[SYSTEM] Created directory: ${directory}`
                 );
 
             }
 
-        }
-    );
+        } catch (error) {
 
-}
-
-
-/* ==========================================
-   CREATE DATABASE FILES
-========================================== */
-
-function createDatabaseFiles() {
-
-    const files = [
-
-        {
-            path:
-                config.USERS_DB,
-
-            content:
-                {}
-        },
-
-        {
-            path:
-                config.SETTINGS_DB,
-
-            content:
-                {}
-        },
-
-        {
-            path:
-                config.GROUPS_DB,
-
-            content:
-                {}
-        }
-
-    ];
-
-
-    files.forEach(
-        file => {
-
-            if (
-                !fs.existsSync(
-                    file.path
-                )
-            ) {
-
-                fs.writeFileSync(
-
-                    file.path,
-
-                    JSON.stringify(
-                        file.content,
-                        null,
-                        2
-                    )
-
-                );
-
-                console.log(
-                    `🗄️ Created database: ${file.path}`
-                );
-
-            }
+            console.error(
+                `[SYSTEM ERROR] Failed creating directory ${directory}:`,
+                error.message
+            );
 
         }
-    );
-
-}
-
-
-/* ==========================================
-   START WHATSAPP BOT
-========================================== */
-
-async function startBot() {
-
-    try {
-
-        console.log(
-            "🤖 Starting WhatsApp Bot..."
-        );
-
-
-        /*
-         =====================================
-
-         IMPORTANT
-
-         Your Baileys connection file should
-         be connected here.
-
-         Example:
-
-         const {
-             startWhatsApp
-         } = require("./lib/whatsapp");
-
-         await startWhatsApp();
-
-         =====================================
-        */
-
-
-        /*
-           For now the dashboard can start
-           even if WhatsApp connection is
-           still initializing.
-        */
-
-        global.botStatus =
-            "online";
-
-
-        console.log(
-            "👑 DRIP QUEEN MD Bot Initialized"
-        );
-
-
-        return true;
 
     }
 
-    catch (error) {
+}
 
-        global.botStatus =
-            "offline";
 
+ensureDirectories();
+
+
+/* ==========================================
+   INITIALIZE DATABASE
+========================================== */
+
+function initializeDatabase() {
+
+    try {
+
+        if (
+            database &&
+            typeof database.initializeDatabase ===
+            "function"
+        ) {
+
+            database.initializeDatabase();
+
+        }
+
+    } catch (error) {
 
         console.error(
-            "❌ Bot Startup Error:",
+            "[DATABASE ERROR]",
             error.message
         );
 
-
-        return false;
-
     }
 
 }
 
 
-/* ==========================================
-   DISPLAY STARTUP BANNER
-========================================== */
-
-function showBanner() {
-
-    console.clear();
-
-
-    console.log("");
-
-    console.log(
-        "╔══════════════════════════════════════════╗"
-    );
-
-    console.log(
-        "║                                          ║"
-    );
-
-    console.log(
-        "║          👑 DRIP QUEEN MD 👑             ║"
-    );
-
-    console.log(
-        "║                                          ║"
-    );
-
-    console.log(
-        "╠══════════════════════════════════════════╣"
-    );
-
-    console.log(
-        `║ Version : ${config.BOT_VERSION}`
-    );
-
-    console.log(
-        `║ Creator : ${config.CREATOR}`
-    );
-
-    console.log(
-        `║ Mode    : ${config.MODE}`
-    );
-
-    console.log(
-        `║ Prefix  : ${config.PREFIX}`
-    );
-
-    console.log(
-        "╚══════════════════════════════════════════╝"
-    );
-
-    console.log("");
-
-}
+initializeDatabase();
 
 
 /* ==========================================
-   START APPLICATION
+   EXPRESS APPLICATION
 ========================================== */
 
-async function startApplication() {
+const app = express();
+
+
+/* ==========================================
+   EXPRESS MIDDLEWARE
+========================================== */
+
+app.use(
+    express.json()
+);
+
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
+
+
+/* ==========================================
+   GLOBAL BOT STATE
+========================================== */
+
+global.DRIP_QUEEN_MD = {
+
+    startedAt:
+        Date.now(),
+
+    status:
+        "starting",
+
+    commands:
+        [],
+
+    sessions:
+        new Map()
+
+};
+
+
+/* ==========================================
+   DASHBOARD INITIALIZATION
+========================================== */
+
+function initializeDashboard() {
 
     try {
 
-        showBanner();
+        if (
+            typeof createDashboard ===
+            "function"
+        ) {
+
+            createDashboard(app);
+
+            console.log(
+                "[DASHBOARD] Dashboard initialized"
+            );
+
+            return;
+
+        }
+
+
+        if (
+            createDashboard &&
+            typeof createDashboard.createDashboard ===
+            "function"
+        ) {
+
+            createDashboard.createDashboard(
+                app
+            );
+
+            console.log(
+                "[DASHBOARD] Dashboard initialized"
+            );
+
+            return;
+
+        }
 
 
         console.log(
-            "⚙️ Preparing application..."
+            "[DASHBOARD] dashboard.js not available or invalid"
         );
 
+    } catch (error) {
 
-        /*
-           CREATE DIRECTORIES
-        */
-
-        createDirectories();
-
-
-        /*
-           CREATE DATABASE FILES
-        */
-
-        createDatabaseFiles();
-
-
-        /*
-           START DASHBOARD SERVER FIRST
-
-           This ensures the dashboard loads
-           even while WhatsApp initializes.
-        */
-
-        console.log(
-            "🌐 Starting Dashboard Server..."
+        console.error(
+            "[DASHBOARD ERROR]",
+            error.message
         );
-
-
-        await startServer();
-
-
-        /*
-           START WHATSAPP BOT
-        */
-
-        await startBot();
-
-
-        console.log("");
-
-        console.log(
-            "════════════════════════════════════"
-        );
-
-        console.log(
-            "🚀 DRIP QUEEN MD STARTED SUCCESSFULLY"
-        );
-
-        console.log(
-            "════════════════════════════════════"
-        );
-
-        console.log("");
 
     }
 
-    catch (error) {
-
-        global.botStatus =
-            "offline";
+}
 
 
-        console.error(
-            "❌ Application Startup Failed:"
+initializeDashboard();
+
+
+/* ==========================================
+   LOAD COMMANDS
+========================================== */
+
+async function initializeCommands() {
+
+    try {
+
+        if (!commandLoader) {
+
+            console.log(
+                "[COMMANDS] commandLoader.js not found"
+            );
+
+            return [];
+
+        }
+
+
+        if (
+            typeof commandLoader.loadCommands !==
+            "function"
+        ) {
+
+            console.log(
+                "[COMMANDS] loadCommands() function not found"
+            );
+
+            return [];
+
+        }
+
+
+        console.log(
+            "[COMMANDS] Loading commands..."
         );
 
+
+        const commands =
+            await commandLoader.loadCommands();
+
+
+        global.DRIP_QUEEN_MD.commands =
+            Array.isArray(commands)
+                ? commands
+                : [];
+
+
+        console.log(
+            `[COMMANDS] Loaded ${global.DRIP_QUEEN_MD.commands.length} commands`
+        );
+
+
+        return global.DRIP_QUEEN_MD.commands;
+
+
+    } catch (error) {
+
         console.error(
+            "[COMMANDS ERROR]",
+            error
+        );
+
+        return [];
+
+    }
+
+}
+
+
+/* ==========================================
+   RESTORE EXISTING SESSIONS
+========================================== */
+
+async function initializeSessions() {
+
+    try {
+
+        if (!sessionManager) {
+
+            console.log(
+                "[SESSIONS] session.js not found"
+            );
+
+            return [];
+
+        }
+
+
+        if (
+            typeof sessionManager.restoreSessions !==
+            "function"
+        ) {
+
+            console.log(
+                "[SESSIONS] restoreSessions() function not found"
+            );
+
+            return [];
+
+        }
+
+
+        console.log(
+            "[SESSIONS] Restoring saved sessions..."
+        );
+
+
+        const sessions =
+            await sessionManager.restoreSessions();
+
+
+        console.log(
+            `[SESSIONS] Restored ${sessions.length} session(s)`
+        );
+
+
+        return sessions;
+
+
+    } catch (error) {
+
+        console.error(
+            "[SESSIONS ERROR]",
+            error
+        );
+
+        return [];
+
+    }
+
+}
+
+
+/* ==========================================
+   START SERVER
+========================================== */
+
+function startServer() {
+
+    try {
+
+        app.listen(
+            config.PORT,
+            config.HOST,
+
+            () => {
+
+                console.clear();
+
+
+                console.log(
+                    "╔══════════════════════════════════════════╗"
+                );
+
+                console.log(
+                    `║ ${config.BOT_NAME.padEnd(40)} ║`
+                );
+
+                console.log(
+                    "╠══════════════════════════════════════════╣"
+                );
+
+                console.log(
+                    `║ Version: ${config.BOT_VERSION.padEnd(31)} ║`
+                );
+
+                console.log(
+                    `║ Creator: ${config.CREATOR.padEnd(31)} ║`
+                );
+
+                console.log(
+                    `║ Mode: ${config.MODE.padEnd(34)} ║`
+                );
+
+                console.log(
+                    "╠══════════════════════════════════════════╣"
+                );
+
+                console.log(
+                    `║ Dashboard Port: ${String(config.PORT).padEnd(24)} ║`
+                );
+
+                console.log(
+                    `║ Host: ${config.HOST.padEnd(34)} ║`
+                );
+
+                console.log(
+                    "╚══════════════════════════════════════════╝"
+                );
+
+
+                console.log("");
+
+
+                console.log(
+                    `[SERVER] Running on ${config.HOST}:${config.PORT}`
+                );
+
+
+                console.log(
+                    `[BOT] ${config.BOT_NAME} is online`
+                );
+
+
+                global.DRIP_QUEEN_MD.status =
+                    "online";
+
+            }
+
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[SERVER ERROR]",
             error
         );
 
@@ -385,7 +471,63 @@ async function startApplication() {
 
 
 /* ==========================================
-   PROCESS ERROR HANDLING
+   MAIN START FUNCTION
+========================================== */
+
+async function startBot() {
+
+    try {
+
+        console.log(
+            "[SYSTEM] Starting DRIP QUEEN MD..."
+        );
+
+
+        /*
+           Step 1: Database
+        */
+
+        initializeDatabase();
+
+
+        /*
+           Step 2: Commands
+        */
+
+        await initializeCommands();
+
+
+        /*
+           Step 3: Restore WhatsApp sessions
+        */
+
+        await initializeSessions();
+
+
+        /*
+           Step 4: Start dashboard
+        */
+
+        startServer();
+
+
+    } catch (error) {
+
+        console.error(
+            "[STARTUP ERROR]",
+            error
+        );
+
+        global.DRIP_QUEEN_MD.status =
+            "error";
+
+    }
+
+}
+
+
+/* ==========================================
+   ERROR HANDLERS
 ========================================== */
 
 process.on(
@@ -394,10 +536,7 @@ process.on(
     error => {
 
         console.error(
-            "❌ Uncaught Exception:"
-        );
-
-        console.error(
+            "[UNCAUGHT EXCEPTION]",
             error
         );
 
@@ -412,10 +551,7 @@ process.on(
     error => {
 
         console.error(
-            "❌ Unhandled Rejection:"
-        );
-
-        console.error(
+            "[UNHANDLED REJECTION]",
             error
         );
 
@@ -425,7 +561,78 @@ process.on(
 
 
 /* ==========================================
-   START
+   GRACEFUL SHUTDOWN
 ========================================== */
 
-startApplication();
+async function shutdown(signal) {
+
+    console.log(
+        `\n[SYSTEM] Received ${signal}`
+    );
+
+
+    console.log(
+        "[SYSTEM] Shutting down safely..."
+    );
+
+
+    global.DRIP_QUEEN_MD.status =
+        "offline";
+
+
+    try {
+
+        if (
+            sessionManager &&
+            typeof sessionManager.shutdown ===
+            "function"
+        ) {
+
+            await sessionManager.shutdown();
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[SHUTDOWN ERROR]",
+            error
+        );
+
+    }
+
+
+    console.log(
+        "[SYSTEM] Shutdown complete"
+    );
+
+
+    process.exit(0);
+
+}
+
+
+process.on(
+    "SIGINT",
+    () => shutdown("SIGINT")
+);
+
+
+process.on(
+    "SIGTERM",
+    () => shutdown("SIGTERM")
+);
+
+
+/* ==========================================
+   START APPLICATION
+========================================== */
+
+startBot();
+
+
+/* ==========================================
+   EXPORT EXPRESS APP
+========================================== */
+
+module.exports = app;

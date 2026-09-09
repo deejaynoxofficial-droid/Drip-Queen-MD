@@ -30,7 +30,7 @@ const {
     disconnectSession
 
 } = require(
-    "./lib/whatsapp"
+    "./lib/Whatsapp"
 );
 
 
