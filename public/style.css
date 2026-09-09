@@ -100,7 +100,7 @@ button {
    LOADING SCREEN
 ========================================== */
 
-.loading-screen {
+/*.loading-screen {
     position: fixed;
 
     inset: 0;
@@ -122,6 +122,10 @@ button {
     justify-content: center;
 
     z-index: 9999;
+}*/
+
+.loading-screen {
+    display: none !important;
 }
 
 
