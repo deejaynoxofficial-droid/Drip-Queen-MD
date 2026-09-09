@@ -644,7 +644,7 @@ function escapeAttribute(value) {
    INITIALIZE DASHBOARD
 ========================================== */
 
-document.addEventListener(
+/*document.addEventListener(
 
     "DOMContentLoaded",
 
@@ -668,9 +668,13 @@ document.addEventListener(
 
             loadFeatures()
 
-        ]);
+        ]);*/
 
+// ==========================================
+// DASHBOARD AUTO-LOADING DISABLED
+// ==========================================
 
+console.log("[DASHBOARD] Auto-loading disabled.");
         /*
            Refresh status and sessions.
         */
