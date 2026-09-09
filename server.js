@@ -1,40 +1,76 @@
 /* ==========================================
-   DRIP QUEEN MD - SERVER
+   DRIP QUEEN MD - DASHBOARD SERVER
    CREATED BY NOX STAR TECH
 ========================================== */
 
 require("dotenv").config();
 
+
+/* ==========================================
+   IMPORTS
+========================================== */
+
 const express = require("express");
+
 const path = require("path");
+
 const fs = require("fs");
 
-const config = require("./config");
+
+const config = require(
+    "./config"
+);
+
+
+const {
+    generatePairingCode,
+
+    getSessions,
+
+    disconnectSession
+
+} = require(
+    "./lib/whatsapp"
+);
 
 
 /* ==========================================
-   CREATE EXPRESS APP
+   EXPRESS APP
 ========================================== */
 
 const app = express();
 
 
 /* ==========================================
-   GLOBAL VARIABLES
+   GLOBAL BOT STATUS
 ========================================== */
 
-const startTime = Date.now();
+global.botStatus =
+    global.botStatus ||
+    "starting";
 
 
-/*
-   WhatsApp connections will be stored here.
+global.autoFeatures =
+    global.autoFeatures ||
+    {
 
-   This allows the dashboard to communicate
-   with the bot system.
-*/
+        antilink: false,
 
-global.botConnections =
-    global.botConnections || new Map();
+        antidelete: false,
+
+        autoreact: false,
+
+        autoreply: false,
+
+        autotyping: false,
+
+        autorecording: false,
+
+        welcome: false,
+
+        goodbye: false
+
+    };
 
 
 /* ==========================================
@@ -42,165 +78,764 @@ global.botConnections =
 ========================================== */
 
 app.use(
-    express.json({
-        limit: "50mb"
-    })
+    express.json()
 );
 
 
 app.use(
     express.urlencoded({
-        extended: true,
-        limit: "50mb"
+
+        extended: true
+
     })
 );
 
 
 /* ==========================================
-   CORS HEADERS
+   STATIC DASHBOARD
 ========================================== */
-
-app.use((req, res, next) => {
-
-    res.header(
-        "Access-Control-Allow-Origin",
-        "*"
-    );
-
-    res.header(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization"
-    );
-
-    res.header(
-        "Access-Control-Allow-Methods",
-        "GET, POST, PUT, DELETE, OPTIONS"
-    );
-
-    next();
-
-});
-
-
-/* ==========================================
-   STATIC DASHBOARD FILES
-========================================== */
-
-const publicPath =
-    path.join(
-        __dirname,
-        "public"
-    );
-
 
 app.use(
-    express.static(publicPath)
+
+    express.static(
+
+        path.join(
+            __dirname,
+            "public"
+        )
+
+    )
+
 );
 
 
 /* ==========================================
-   HEALTH CHECK
+   START TIME
 ========================================== */
 
-app.get(
-    "/health",
-    (req, res) => {
+const startTime =
+    Date.now();
 
-        res.status(200).json({
 
-            status:
-                "online",
+/* ==========================================
+   HELPER - FORMAT UPTIME
+========================================== */
 
-            bot:
-                config.BOT_NAME,
+function formatUptime() {
 
-            version:
-                config.BOT_VERSION,
+    const seconds =
+        Math.floor(
 
-            uptime:
-                Math.floor(
-                    (Date.now() - startTime) / 1000
-                ),
+            (
+                Date.now() -
+                startTime
+            ) / 1000
 
-            timestamp:
-                new Date().toISOString()
+        );
 
-        });
+
+    const days =
+        Math.floor(
+            seconds / 86400
+        );
+
+
+    const hours =
+        Math.floor(
+            (
+                seconds % 86400
+            ) / 3600
+        );
+
+
+    const minutes =
+        Math.floor(
+            (
+                seconds % 3600
+            ) / 60
+        );
+
+
+    const remainingSeconds =
+        seconds % 60;
+
+
+    if (days > 0) {
+
+        return `${days}d ${hours}h`;
 
     }
+
+
+    if (hours > 0) {
+
+        return `${hours}h ${minutes}m`;
+
+    }
+
+
+    if (minutes > 0) {
+
+        return `${minutes}m ${remainingSeconds}s`;
+
+    }
+
+
+    return `${remainingSeconds}s`;
+
+}
+
+
+/* ==========================================
+   HELPER - GET COMMANDS
+========================================== */
+
+function getCommands() {
+
+    const commandsPath =
+        config.COMMANDS_PATH;
+
+
+    const commands = [];
+
+
+    try {
+
+        if (
+            !fs.existsSync(
+                commandsPath
+            )
+        ) {
+
+            return commands;
+
+        }
+
+
+        const files =
+            fs.readdirSync(
+                commandsPath
+            );
+
+
+        files.forEach(
+            file => {
+
+                if (
+                    !file.endsWith(".js")
+                ) {
+
+                    return;
+
+                }
+
+
+                const commandName =
+                    file.replace(
+                        ".js",
+                        ""
+                    );
+
+
+                commands.push({
+
+                    name:
+                        commandName,
+
+                    description:
+                        "DRIP QUEEN MD command",
+
+                    file
+
+                });
+
+            }
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Command Scan Error:",
+            error.message
+        );
+
+    }
+
+
+    return commands;
+
+}
+
+
+/* ==========================================
+   HOME ROUTE
+========================================== */
+
+app.get(
+
+    "/",
+
+    (
+        req,
+        res
+    ) => {
+
+        res.sendFile(
+
+            path.join(
+
+                __dirname,
+
+                "public",
+
+                "index.html"
+
+            )
+
+        );
+
+    }
+
 );
 
 
 /* ==========================================
-   API STATUS
+   API - SERVER STATUS
 ========================================== */
 
 app.get(
-    "/api/status",
-    (req, res) => {
 
-        const uptime =
-            Math.floor(
-                (Date.now() - startTime) / 1000
-            );
+    "/api/status",
+
+    (
+        req,
+        res
+    ) => {
+
+        const sessions =
+            getSessions();
 
 
         res.json({
 
-            success:
-                true,
+            success: true,
 
-            server:
-                "online",
 
-            botStatus:
-                global.botStatus ||
-                "starting",
+            status:
 
-            botName:
+                global.botStatus ===
+                "online"
+
+                    ? "online"
+
+                    : "offline",
+
+
+            bot:
+
                 config.BOT_NAME,
 
+
             version:
+
                 config.BOT_VERSION,
 
-            mode:
-                config.MODE,
 
-            prefix:
-                config.PREFIX,
+            users:
 
-            uptime,
+                sessions.length,
 
-            connectedUsers:
-                global.botConnections.size ||
 
-                0,
+            commands:
+
+                getCommands().length,
+
+
+            uptime:
+
+                formatUptime(),
+
 
             timestamp:
+
                 Date.now()
 
         });
 
     }
+
 );
 
 
 /* ==========================================
-   API BOT INFORMATION
+   API - GENERATE PAIRING CODE
+========================================== */
+
+app.post(
+
+    "/api/pair",
+
+    async (
+        req,
+        res
+    ) => {
+
+        try {
+
+            let {
+
+                number
+
+            } = req.body;
+
+
+            /* ==============================
+               VALIDATE NUMBER
+            ============================== */
+
+            if (!number) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "WhatsApp number is required."
+
+                });
+
+            }
+
+
+            /*
+               Remove spaces, + and symbols.
+            */
+
+            number =
+                String(number)
+                    .replace(/\D/g, "");
+
+
+            if (
+                number.length < 8
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Please enter a valid number with country code."
+
+                });
+
+            }
+
+
+            console.log(
+                `🔑 Pairing request: ${number}`
+            );
+
+
+            /* ==============================
+               GENERATE CODE
+            ============================== */
+
+            const result =
+                await generatePairingCode(
+                    number
+                );
+
+
+            return res.json({
+
+                success: true,
+
+                message:
+                    "Pairing code generated successfully.",
+
+                number:
+                    result.number,
+
+                code:
+                    result.code
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Pairing API Error:",
+                error.message
+            );
+
+
+            return res.status(500).json({
+
+                success: false,
+
+                message:
+
+                    error.message ||
+
+                    "Failed to generate pairing code."
+
+            });
+
+        }
+
+    }
+
+);
+
+
+/* ==========================================
+   API - GET ALL SESSIONS
 ========================================== */
 
 app.get(
-    "/api/info",
-    (req, res) => {
+
+    "/api/sessions",
+
+    (
+        req,
+        res
+    ) => {
+
+        try {
+
+            const sessions =
+                getSessions();
+
+
+            res.json({
+
+                success: true,
+
+                total:
+                    sessions.length,
+
+                sessions
+
+            });
+
+        }
+
+        catch (error) {
+
+            res.status(500).json({
+
+                success: false,
+
+                message:
+                    "Failed to load sessions."
+
+            });
+
+        }
+
+    }
+
+);
+
+
+/* ==========================================
+   API - DISCONNECT SESSION
+========================================== */
+
+app.delete(
+
+    "/api/sessions/:number",
+
+    async (
+        req,
+        res
+    ) => {
+
+        try {
+
+            const number =
+                String(
+                    req.params.number
+                )
+                    .replace(/\D/g, "");
+
+
+            if (!number) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Invalid session number."
+
+                });
+
+            }
+
+
+            console.log(
+                `🔌 Disconnecting: ${number}`
+            );
+
+
+            await disconnectSession(
+                number
+            );
+
+
+            return res.json({
+
+                success: true,
+
+                message:
+                    "Session disconnected successfully."
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "Disconnect Error:",
+                error.message
+            );
+
+
+            return res.status(500).json({
+
+                success: false,
+
+                message:
+
+                    error.message ||
+
+                    "Failed to disconnect session."
+
+            });
+
+        }
+
+    }
+
+);
+
+
+/* ==========================================
+   API - GET COMMANDS
+========================================== */
+
+app.get(
+
+    "/api/commands",
+
+    (
+        req,
+        res
+    ) => {
+
+        try {
+
+            const commands =
+                getCommands();
+
+
+            res.json({
+
+                success: true,
+
+                total:
+                    commands.length,
+
+                commands
+
+            });
+
+        }
+
+        catch (error) {
+
+            res.status(500).json({
+
+                success: false,
+
+                commands: []
+
+            });
+
+        }
+
+    }
+
+);
+
+
+/* ==========================================
+   API - GET AUTO FEATURES
+========================================== */
+
+app.get(
+
+    "/api/features",
+
+    (
+        req,
+        res
+    ) => {
 
         res.json({
 
-            success:
-                true,
+            success: true,
 
-            data: {
+            features:
+                global.autoFeatures
 
-                botName:
+        });
+
+    }
+
+);
+
+
+/* ==========================================
+   API - UPDATE AUTO FEATURE
+========================================== */
+
+app.post(
+
+    "/api/features",
+
+    (
+        req,
+        res
+    ) => {
+
+        try {
+
+            const {
+
+                feature,
+
+                enabled
+
+            } = req.body;
+
+
+            if (!feature) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Feature name is required."
+
+                });
+
+            }
+
+
+            /*
+               Check if feature exists.
+            */
+
+            if (
+
+                !Object.prototype.hasOwnProperty.call(
+
+                    global.autoFeatures,
+
+                    feature
+
+                )
+
+            ) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "Invalid feature."
+
+                });
+
+            }
+
+
+            global.autoFeatures[
+                feature
+            ] =
+                Boolean(enabled);
+
+
+            console.log(
+
+                `⚡ Feature Updated: ${feature} = ${enabled}`
+
+            );
+
+
+            return res.json({
+
+                success: true,
+
+                feature,
+
+                enabled:
+                    global.autoFeatures[
+                        feature
+                    ]
+
+            });
+
+        }
+
+        catch (error) {
+
+            return res.status(500).json({
+
+                success: false,
+
+                message:
+                    "Failed to update feature."
+
+            });
+
+        }
+
+    }
+
+);
+
+
+/* ==========================================
+   API - SETTINGS
+========================================== */
+
+app.get(
+
+    "/api/settings",
+
+    (
+        req,
+        res
+    ) => {
+
+        res.json({
+
+            success: true,
+
+
+            bot: {
+
+                name:
                     config.BOT_NAME,
 
                 version:
@@ -216,453 +851,182 @@ app.get(
                     config.PREFIX,
 
                 mode:
-                    config.MODE,
+                    config.MODE
 
-                nodeVersion:
+            },
+
+
+            system: {
+
+                node:
                     process.version,
 
                 platform:
-                    process.platform
+                    process.platform,
 
-            }
+                database:
 
-        });
-
-    }
-);
-
-
-/* ==========================================
-   API SESSIONS
-========================================== */
-
-app.get(
-    "/api/sessions",
-    (req, res) => {
-
-        const sessions = [];
-
-
-        global.botConnections.forEach(
-            (connection, number) => {
-
-                sessions.push({
-
-                    number,
-
-                    status:
-
-                        connection.status ||
-                        "connected",
-
-                    connectedAt:
-
-                        connection.connectedAt ||
-                        Date.now()
-
-                });
-
-            }
-        );
-
-
-        res.json({
-
-            success:
-                true,
-
-            total:
-                sessions.length,
-
-            sessions
-
-        });
-
-    }
-);
-
-
-/* ==========================================
-   API COMMANDS
-========================================== */
-
-app.get(
-    "/api/commands",
-    (req, res) => {
-
-        const commandsPath =
-            config.COMMANDS_PATH;
-
-
-        const commands = [];
-
-
-        try {
-
-            if (
-                fs.existsSync(
-                    commandsPath
-                )
-            ) {
-
-                const files =
-                    fs.readdirSync(
-                        commandsPath
-                    );
-
-
-                files
-                    .filter(
-                        file =>
-                            file.endsWith(".js")
+                    fs.existsSync(
+                        config.DATABASE_PATH
                     )
-                    .forEach(
-                        file => {
 
-                            const name =
-                                file
-                                    .replace(
-                                        ".js",
-                                        ""
-                                    );
+                        ? "Connected"
+
+                        : "Not Found",
 
 
-                            commands.push({
-
-                                name,
-
-                                description:
-                                    "DRIP QUEEN MD command"
-
-                            });
-
-                        }
-                    );
+                dashboard:
+                    "Active"
 
             }
 
-        }
-
-        catch (error) {
-
-            console.error(
-                "Command API Error:",
-                error.message
-            );
-
-        }
-
-
-        res.json({
-
-            success:
-                true,
-
-            total:
-                commands.length,
-
-            commands
-
         });
 
     }
+
 );
 
 
 /* ==========================================
-   API AUTO FEATURES
+   API - SERVER INFORMATION
 ========================================== */
 
 app.get(
-    "/api/features",
-    (req, res) => {
 
-        const defaultFeatures = {
+    "/api/info",
 
-            antilink:
-                false,
+    (
+        req,
+        res
+    ) => {
 
-            antidelete:
-                false,
-
-            autoreact:
-                false,
-
-            autoreply:
-                false,
-
-            autotyping:
-                false,
-
-            autorecording:
-                false,
-
-            welcome:
-                false,
-
-            goodbye:
-                false
-
-        };
+        const sessions =
+            getSessions();
 
 
         res.json({
 
-            success:
-                true,
-
-            features:
-
-                global.autoFeatures ||
-                defaultFeatures
-
-        });
-
-    }
-);
+            success: true,
 
 
-/* ==========================================
-   UPDATE AUTO FEATURES
-========================================== */
+            server: {
 
-app.post(
-    "/api/features",
-    (req, res) => {
+                status:
+                    global.botStatus,
 
-        const {
+                uptime:
+                    formatUptime(),
 
-            setting,
+                users:
+                    sessions.length,
 
-            value
+                port:
+                    config.PORT
 
-        } = req.body;
-
-
-        if (!setting) {
-
-            return res.status(400).json({
-
-                success:
-                    false,
-
-                message:
-                    "Feature setting is required."
-
-            });
-
-        }
+            },
 
 
-        global.autoFeatures =
-            global.autoFeatures || {};
+            bot: {
 
+                name:
+                    config.BOT_NAME,
 
-        global.autoFeatures[
-            setting
-        ] = Boolean(value);
+                version:
+                    config.BOT_VERSION
 
-
-        console.log(
-            `⚡ Feature Updated: ${setting} = ${value}`
-        );
-
-
-        res.json({
-
-            success:
-                true,
-
-            message:
-                `${setting} updated successfully.`,
-
-            features:
-                global.autoFeatures
+            }
 
         });
 
     }
+
 );
 
 
 /* ==========================================
-   PAIRING PLACEHOLDER ROUTE
-
-   The real pairing logic will be connected
-   to Baileys in the next step.
+   404 API HANDLER
 ========================================== */
 
-app.post(
-    "/api/pair",
-    async (req, res) => {
+app.use(
 
-        const {
+    "/api",
 
-            number
-
-        } = req.body;
-
-
-        if (!number) {
-
-            return res.status(400).json({
-
-                success:
-                    false,
-
-                message:
-                    "WhatsApp number is required."
-
-            });
-
-        }
-
-
-        const cleanNumber =
-            String(number)
-                .replace(/\D/g, "");
-
-
-        if (
-            cleanNumber.length < 8
-        ) {
-
-            return res.status(400).json({
-
-                success:
-                    false,
-
-                message:
-                    "Please enter a valid WhatsApp number with country code."
-
-            });
-
-        }
-
-
-        /*
-           Real Baileys pairing code
-           will replace this section.
-        */
-
-
-        res.status(501).json({
-
-            success:
-                false,
-
-            message:
-                "Pairing system is being initialized. Connect the Baileys pairing handler next."
-
-        });
-
-    }
-);
-
-
-/* ==========================================
-   DASHBOARD FALLBACK
-========================================== */
-
-app.get(
-    "*",
-    (req, res) => {
-
-        const indexFile =
-            path.join(
-                publicPath,
-                "index.html"
-            );
-
-
-        if (
-            fs.existsSync(
-                indexFile
-            )
-        ) {
-
-            return res.sendFile(
-                indexFile
-            );
-
-        }
-
+    (
+        req,
+        res
+    ) => {
 
         res.status(404).json({
 
-            success:
-                false,
+            success: false,
 
             message:
-                "Dashboard files not found."
+                "API endpoint not found."
 
         });
 
     }
+
 );
 
 
 /* ==========================================
-   START SERVER FUNCTION
+   START SERVER
 ========================================== */
 
 function startServer() {
 
     return new Promise(
+
         resolve => {
 
-            const server =
-                app.listen(
+            app.listen(
 
-                    config.PORT,
+                config.PORT,
 
-                    config.HOST,
+                config.HOST,
 
-                    () => {
+                () => {
 
-                        console.log("");
+                    console.log("");
 
-                        console.log(
-                            "╔══════════════════════════════════════╗"
-                        );
+                    console.log(
+                        "══════════════════════════════════════"
+                    );
 
-                        console.log(
-                            `║ 👑 ${config.BOT_NAME}`
-                        );
+                    console.log(
+                        `👑 ${config.BOT_NAME}`
+                    );
 
-                        console.log(
-                            "╠══════════════════════════════════════╣"
-                        );
+                    console.log(
+                        "🌐 Dashboard Server Started"
+                    );
 
-                        console.log(
-                            `║ 🌐 Dashboard: http://localhost:${config.PORT}`
-                        );
+                    console.log(
+                        `📡 Host: ${config.HOST}`
+                    );
 
-                        console.log(
-                            `║ 🚀 Server Status: ONLINE`
-                        );
+                    console.log(
+                        `🔌 Port: ${config.PORT}`
+                    );
 
-                        console.log(
-                            "╚══════════════════════════════════════╝"
-                        );
+                    console.log(
+                        `🔗 http://localhost:${config.PORT}`
+                    );
 
-                        console.log("");
+                    console.log(
+                        "══════════════════════════════════════"
+                    );
 
-                        resolve(server);
-
-                    }
-
-                );
+                    console.log("");
 
 
-            server.on(
-                "error",
+                    global.botStatus =
+                        "online";
 
-                error => {
 
-                    console.error(
-                        "❌ Server Error:",
-                        error.message
+                    resolve(
+                        app
                     );
 
                 }
@@ -670,6 +1034,7 @@ function startServer() {
             );
 
         }
+
     );
 
 }
@@ -683,8 +1048,6 @@ module.exports = {
 
     app,
 
-    startServer,
-
-    startTime
+    startServer
 
 };
