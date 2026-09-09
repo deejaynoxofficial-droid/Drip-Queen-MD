@@ -1,32 +1,42 @@
 /* ==========================================
    DRIP QUEEN MD DASHBOARD
    Frontend JavaScript
-   Creator: NOX STAR TECH
+   CREATED BY NOX STAR TECH
 ========================================== */
 
 "use strict";
 
 
 /* ==========================================
-   GLOBAL VARIABLES
+   API ENDPOINTS
 ========================================== */
 
 const API = {
+
     status: "/api/status",
+
     sessions: "/api/sessions",
+
     pair: "/api/pair",
+
     commands: "/api/commands",
+
     settings: "/api/settings",
+
     features: "/api/features"
+
 };
 
 
 /* ==========================================
-   DOM ELEMENTS
+   GLOBAL VARIABLES
 ========================================== */
 
 const loadingScreen =
     document.getElementById("loadingScreen");
+
+const app =
+    document.getElementById("app");
 
 const sidebar =
     document.getElementById("sidebar");
@@ -46,121 +56,128 @@ const refreshBtn =
 const toast =
     document.getElementById("toast");
 
+let allCommands = [];
 
-/* ==========================================
-   INITIALIZE DASHBOARD
-========================================== */
-
-/*document.addEventListener("DOMContentLoaded", async () => {
-
-    initializeNavigation();
-
-    initializeMobileMenu();
-
-    initializeButtons();
-
-    await loadDashboard();
-
-    setTimeout(() => {
-
-        if (loadingScreen) {
-            loadingScreen.style.opacity = "0";
-
-            setTimeout(() => {
-                loadingScreen.style.display = "none";
-            }, 400);
-        }
-
-    }, 800);
-
-});*/
+let featureListenersInitialized = false;
 
 
 /* ==========================================
-   INITIALIZE DASHBOARD
+   DASHBOARD INITIALIZATION
 ========================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
-
-    const app = document.getElementById("app");
-
-
-    /* ======================================
-       INITIALIZE UI
-    ====================================== */
-
-    initializeNavigation();
-
-    initializeMobileMenu();
-
-    initializeButtons();
-
-    initializeQuickActions();
-
-
-    /* ======================================
-       LOAD DATA IN BACKGROUND
-    ====================================== */
-
-    loadDashboard();
-
-
-    /* ======================================
-       LOADING SCREEN - EXACTLY 5 SECONDS
-    ====================================== */
-
-    setTimeout(() => {
-
-        /* Show Dashboard */
-
-        if (app) {
-
-            app.classList.remove("hidden");
-
-        }
-
-
-        /* Fade Loading Screen */
-
-        if (loadingScreen) {
-
-            loadingScreen.style.opacity = "0";
-
-            loadingScreen.style.pointerEvents = "none";
-
-
-            setTimeout(() => {
-
-                loadingScreen.style.display = "none";
-
-            }, 500);
-
-        }
-
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
         console.log(
-            "[DASHBOARD] DRIP QUEEN MD Dashboard Loaded"
+            "[DRIP QUEEN MD] Initializing Dashboard..."
         );
 
 
-    }, 5000);
+        /* Initialize UI */
 
-});
+        initializeNavigation();
+
+        initializeMobileMenu();
+
+        initializeButtons();
+
+        initializeQuickActions();
+
+        initializeRefreshSessions();
+
+
+        /* Load backend data without blocking UI */
+
+        loadDashboard();
+
+
+        /* ======================================
+           FORCE LOADING SCREEN TO CLOSE
+           AFTER EXACTLY 5 SECONDS
+        ====================================== */
+
+        setTimeout(() => {
+
+            showDashboard();
+
+        }, 5000);
+
+    }
+);
+
 
 /* ==========================================
-   LOAD DASHBOARD
+   SHOW DASHBOARD
+========================================== */
+
+function showDashboard() {
+
+    console.log(
+        "[DRIP QUEEN MD] Opening Dashboard..."
+    );
+
+
+    if (app) {
+
+        app.classList.remove("hidden");
+
+        app.style.display = "";
+
+        app.style.opacity = "1";
+
+    }
+
+
+    if (loadingScreen) {
+
+        loadingScreen.style.opacity = "0";
+
+        loadingScreen.style.pointerEvents =
+            "none";
+
+
+        setTimeout(() => {
+
+            loadingScreen.style.display =
+                "none";
+
+        }, 500);
+
+    }
+
+
+    document.body.classList.add(
+        "dashboard-loaded"
+    );
+
+}
+
+
+/* ==========================================
+   LOAD DASHBOARD DATA
 ========================================== */
 
 async function loadDashboard() {
 
+    const tasks = [
+
+        loadStatus(),
+
+        loadSessions(),
+
+        loadCommands(),
+
+        loadFeatures(),
+
+        loadSettings()
+
+    ];
+
+
     try {
 
-        await Promise.all([
-            loadStatus(),
-            loadSessions(),
-            loadCommands(),
-            loadFeatures()
-        ]);
+        await Promise.allSettled(tasks);
 
     } catch (error) {
 
@@ -175,27 +192,21 @@ async function loadDashboard() {
 
 
 /* ==========================================
-   QUICK ACTION NAVIGATION
+   NAVIGATION
 ========================================== */
 
-function initializeQuickActions() {
+function initializeNavigation() {
 
-    const actionButtons =
-        document.querySelectorAll("[data-go]");
+    navItems.forEach(item => {
 
-
-    actionButtons.forEach(button => {
-
-        button.addEventListener(
+        item.addEventListener(
             "click",
             () => {
 
                 const pageName =
-                    button.dataset.go;
-
+                    item.dataset.page;
 
                 if (!pageName) return;
-
 
                 switchPage(pageName);
 
@@ -206,29 +217,10 @@ function initializeQuickActions() {
 
 }
 
+
 /* ==========================================
-   NAVIGATION SYSTEM
+   SWITCH PAGE
 ========================================== */
-
-function initializeNavigation() {
-
-    navItems.forEach(item => {
-
-        item.addEventListener("click", () => {
-
-            const pageName =
-                item.dataset.page;
-
-            if (!pageName) return;
-
-            switchPage(pageName);
-
-        });
-
-    });
-
-}
-
 
 function switchPage(pageName) {
 
@@ -253,19 +245,27 @@ function switchPage(pageName) {
     const targetPage =
         document.getElementById(pageName);
 
+
     const targetNav =
         document.querySelector(
             `[data-page="${pageName}"]`
         );
 
 
-    if (targetPage) {
+    if (!targetPage) {
 
-        targetPage.classList.add(
-            "active-page"
+        console.warn(
+            `[NAVIGATION] Page not found: ${pageName}`
         );
 
+        return;
+
     }
+
+
+    targetPage.classList.add(
+        "active-page"
+    );
 
 
     if (targetNav) {
@@ -275,6 +275,9 @@ function switchPage(pageName) {
         );
 
     }
+
+
+    updatePageTitle(pageName);
 
 
     if (sidebar) {
@@ -287,15 +290,164 @@ function switchPage(pageName) {
 
 
     window.scrollTo({
+
         top: 0,
+
         behavior: "smooth"
+
+    });
+
+
+    /* Refresh specific pages */
+
+    if (pageName === "sessions") {
+
+        loadSessions();
+
+    }
+
+
+    if (pageName === "commands") {
+
+        loadCommands();
+
+    }
+
+}
+
+
+/* ==========================================
+   PAGE TITLES
+========================================== */
+
+function updatePageTitle(pageName) {
+
+    const pageTitle =
+        document.getElementById("pageTitle");
+
+    const pageSubtitle =
+        document.getElementById("pageSubtitle");
+
+
+    const pageData = {
+
+        home: {
+
+            title: "Dashboard",
+
+            subtitle:
+                "Welcome to DRIP QUEEN MD"
+
+        },
+
+        pairing: {
+
+            title: "Connect WhatsApp",
+
+            subtitle:
+                "Generate a secure pairing code"
+
+        },
+
+        sessions: {
+
+            title: "Connected Users",
+
+            subtitle:
+                "Manage WhatsApp sessions"
+
+        },
+
+        autofeatures: {
+
+            title: "Auto Features",
+
+            subtitle:
+                "Configure automation settings"
+
+        },
+
+        commands: {
+
+            title: "Bot Commands",
+
+            subtitle:
+                "Explore available commands"
+
+        },
+
+        settings: {
+
+            title: "Settings",
+
+            subtitle:
+                "Bot and system configuration"
+
+        }
+
+    };
+
+
+    const data =
+        pageData[pageName];
+
+
+    if (!data) return;
+
+
+    if (pageTitle) {
+
+        pageTitle.textContent =
+            data.title;
+
+    }
+
+
+    if (pageSubtitle) {
+
+        pageSubtitle.textContent =
+            data.subtitle;
+
+    }
+
+}
+
+
+/* ==========================================
+   QUICK ACTIONS
+========================================== */
+
+function initializeQuickActions() {
+
+    const buttons =
+        document.querySelectorAll(
+            "[data-go]"
+        );
+
+
+    buttons.forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                const pageName =
+                    button.dataset.go;
+
+                if (!pageName) return;
+
+                switchPage(pageName);
+
+            }
+        );
+
     });
 
 }
 
 
 /* ==========================================
-   MOBILE MENU
+   MOBILE SIDEBAR
 ========================================== */
 
 function initializeMobileMenu() {
@@ -303,33 +455,52 @@ function initializeMobileMenu() {
     if (!menuToggle || !sidebar) return;
 
 
-    menuToggle.addEventListener("click", () => {
+    menuToggle.addEventListener(
+        "click",
+        event => {
 
-        sidebar.classList.toggle("show");
+            event.stopPropagation();
 
-    });
-
-
-    document.addEventListener("click", event => {
-
-        const clickedSidebar =
-            sidebar.contains(event.target);
-
-        const clickedMenu =
-            menuToggle.contains(event.target);
-
-
-        if (
-            !clickedSidebar &&
-            !clickedMenu &&
-            window.innerWidth <= 768
-        ) {
-
-            sidebar.classList.remove("show");
+            sidebar.classList.toggle(
+                "show"
+            );
 
         }
+    );
 
-    });
+
+    document.addEventListener(
+        "click",
+        event => {
+
+            if (
+                window.innerWidth <= 850 &&
+                sidebar.classList.contains("show")
+            ) {
+
+                const clickedSidebar =
+                    sidebar.contains(event.target);
+
+
+                const clickedMenu =
+                    menuToggle.contains(event.target);
+
+
+                if (
+                    !clickedSidebar &&
+                    !clickedMenu
+                ) {
+
+                    sidebar.classList.remove(
+                        "show"
+                    );
+
+                }
+
+            }
+
+        }
+    );
 
 }
 
@@ -340,39 +511,7 @@ function initializeMobileMenu() {
 
 function initializeButtons() {
 
-    if (refreshBtn) {
-
-        refreshBtn.addEventListener(
-            "click",
-            async () => {
-
-                refreshBtn.style.pointerEvents =
-                    "none";
-
-                refreshBtn.style.opacity =
-                    "0.6";
-
-                await loadDashboard();
-
-                showToast(
-                    "Dashboard refreshed successfully"
-                );
-
-                setTimeout(() => {
-
-                    refreshBtn.style.pointerEvents =
-                        "auto";
-
-                    refreshBtn.style.opacity =
-                        "1";
-
-                }, 500);
-
-            }
-        );
-
-    }
-
+    initializeRefreshButton();
 
     initializePairingButton();
 
@@ -380,11 +519,67 @@ function initializeButtons() {
 
     initializeCommandSearch();
 
+    initializeFeatureSwitches();
+
 }
 
 
 /* ==========================================
-   LOAD SERVER STATUS
+   REFRESH DASHBOARD
+========================================== */
+
+function initializeRefreshButton() {
+
+    if (!refreshBtn) return;
+
+
+    refreshBtn.addEventListener(
+        "click",
+        async () => {
+
+            refreshBtn.style.pointerEvents =
+                "none";
+
+
+            refreshBtn.style.opacity =
+                "0.6";
+
+
+            refreshBtn.style.transform =
+                "rotate(360deg)";
+
+
+            await loadDashboard();
+
+
+            showToast(
+                "Dashboard refreshed successfully"
+            );
+
+
+            setTimeout(() => {
+
+                refreshBtn.style.pointerEvents =
+                    "auto";
+
+
+                refreshBtn.style.opacity =
+                    "1";
+
+
+                refreshBtn.style.transform =
+                    "";
+
+            }, 500);
+
+        }
+    );
+
+}
+
+
+/* ==========================================
+   SERVER STATUS
 ========================================== */
 
 async function loadStatus() {
@@ -394,10 +589,11 @@ async function loadStatus() {
         const response =
             await fetch(API.status);
 
+
         if (!response.ok) {
 
             throw new Error(
-                "Failed to fetch status"
+                "Failed to fetch server status"
             );
 
         }
@@ -423,19 +619,37 @@ async function loadStatus() {
 }
 
 
+/* ==========================================
+   UPDATE STATUS UI
+========================================== */
+
 function updateStatusUI(data) {
 
-    const serverStatus =
-        document.getElementById("serverStatus");
+    const statusDot =
+        document.getElementById(
+            "statusDot"
+        );
+
 
     const statusText =
-        document.getElementById("statusText");
+        document.getElementById(
+            "serverStatusText"
+        );
 
-    const statusDot =
-        document.getElementById("statusDot");
+
+    const pairingStatus =
+        document.getElementById(
+            "pairingServerStatus"
+        );
 
 
-    if (data.status === "online") {
+    const online =
+        data.status === "online" ||
+        data.status === true ||
+        data.online === true;
+
+
+    if (online) {
 
         if (statusText) {
 
@@ -444,6 +658,7 @@ function updateStatusUI(data) {
 
         }
 
+
         if (statusDot) {
 
             statusDot.className =
@@ -451,67 +666,90 @@ function updateStatusUI(data) {
 
         }
 
-    } else {
 
-        if (statusText) {
+        if (pairingStatus) {
 
-            statusText.textContent =
-                "Server Offline";
-
-        }
-
-        if (statusDot) {
-
-            statusDot.className =
-                "status-dot offline";
+            pairingStatus.textContent =
+                "🟢 Online";
 
         }
 
-    }
 
-
-    updateText(
-        "botName",
-        data.botName || "DRIP QUEEN MD"
-    );
-
-
-    updateText(
-        "botVersion",
-        data.version || "1.0.0"
-    );
-
-
-    updateText(
-        "modeValue",
-        data.mode || "public"
-    );
-
-
-    updateText(
-        "uptimeValue",
-        formatUptime(data.uptime || 0)
-    );
-
-
-    if (serverStatus) {
-
-        serverStatus.classList.remove(
-            "hidden"
+        updateText(
+            "botStatus",
+            "Online"
         );
 
+    } else {
+
+        updateOfflineStatus();
+
     }
+
+
+    updateText(
+        "serverUptime",
+        formatUptime(
+            data.uptime || 0
+        )
+    );
+
+
+    updateText(
+        "settingBotName",
+        data.botName ||
+        "DRIP QUEEN MD"
+    );
+
+
+    updateText(
+        "settingVersion",
+        data.version ||
+        "1.0.0"
+    );
+
+
+    updateText(
+        "settingMode",
+        (
+            data.mode ||
+            "public"
+        ).toUpperCase()
+    );
 
 }
 
 
+/* ==========================================
+   OFFLINE STATUS
+========================================== */
+
 function updateOfflineStatus() {
 
-    const statusText =
-        document.getElementById("statusText");
-
     const statusDot =
-        document.getElementById("statusDot");
+        document.getElementById(
+            "statusDot"
+        );
+
+
+    const statusText =
+        document.getElementById(
+            "serverStatusText"
+        );
+
+
+    const pairingStatus =
+        document.getElementById(
+            "pairingServerStatus"
+        );
+
+
+    if (statusDot) {
+
+        statusDot.className =
+            "status-dot offline";
+
+    }
 
 
     if (statusText) {
@@ -522,12 +760,18 @@ function updateOfflineStatus() {
     }
 
 
-    if (statusDot) {
+    if (pairingStatus) {
 
-        statusDot.className =
-            "status-dot offline";
+        pairingStatus.textContent =
+            "🔴 Offline";
 
     }
+
+
+    updateText(
+        "botStatus",
+        "Offline"
+    );
 
 }
 
@@ -539,7 +783,9 @@ function updateOfflineStatus() {
 async function loadSessions() {
 
     const sessionsList =
-        document.getElementById("sessionsList");
+        document.getElementById(
+            "sessionsList"
+        );
 
 
     if (!sessionsList) return;
@@ -550,12 +796,26 @@ async function loadSessions() {
         const response =
             await fetch(API.sessions);
 
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Failed to fetch sessions"
+            );
+
+        }
+
+
         const data =
             await response.json();
 
 
         const sessions =
-            data.sessions || [];
+            Array.isArray(data)
+                ? data
+                : (
+                    data.sessions || []
+                );
 
 
         updateText(
@@ -565,22 +825,30 @@ async function loadSessions() {
 
 
         updateText(
-            "totalSessions",
+            "totalUsers",
             sessions.length
         );
 
 
-        if (sessions.length === 0) {
+        if (!sessions.length) {
 
             sessionsList.innerHTML = `
+
                 <div class="empty-state">
+
                     <span>📱</span>
-                    <h3>No Active WhatsApp Sessions</h3>
+
+                    <h3>
+                        No Active WhatsApp Sessions
+                    </h3>
+
                     <p>
                         Connect a WhatsApp account
                         using the Pairing page.
                     </p>
+
                 </div>
+
             `;
 
             return;
@@ -594,14 +862,17 @@ async function loadSessions() {
                 const userId =
                     session.userId ||
                     session.id ||
-                    "Unknown";
+                    session.number ||
+                    "Unknown User";
+
 
                 const connected =
-                    session.connected === true;
+                    session.connected !== false;
 
 
                 return `
-                    <div class="session-card">
+
+                    <div class="session-item">
 
                         <div class="session-user">
 
@@ -611,39 +882,39 @@ async function loadSessions() {
 
                             <div>
 
-                                <h3>
+                                <strong>
                                     ${escapeHTML(userId)}
-                                </h3>
+                                </strong>
 
-                                <p>
-                                    WhatsApp Session
-                                </p>
-
-                                <span
-                                    class="session-status"
-                                >
+                                <small>
                                     ${
                                         connected
-                                            ? "● Connected"
-                                            : "● Connecting"
+                                            ? "🟢 Connected"
+                                            : "🟡 Connecting"
                                     }
-                                </span>
+                                </small>
 
                             </div>
 
                         </div>
 
-                        <button
-                            class="remove-session-btn"
-                            onclick="removeSession('${escapeAttribute(userId)}')"
-                        >
-                            Remove
-                        </button>
+                        <div class="session-actions">
+
+                            <button
+                                class="session-btn disconnect"
+                                onclick="removeSession('${escapeAttribute(userId)}')"
+                            >
+                                Disconnect
+                            </button>
+
+                        </div>
 
                     </div>
+
                 `;
 
             }).join("");
+
 
     } catch (error) {
 
@@ -654,6 +925,7 @@ async function loadSessions() {
 
 
         sessionsList.innerHTML = `
+
             <div class="empty-state">
 
                 <span>⚠️</span>
@@ -663,9 +935,49 @@ async function loadSessions() {
                 </h3>
 
             </div>
+
         `;
 
     }
+
+}
+
+
+/* ==========================================
+   REFRESH SESSIONS BUTTON
+========================================== */
+
+function initializeRefreshSessions() {
+
+    const button =
+        document.getElementById(
+            "refreshSessionsBtn"
+        );
+
+
+    if (!button) return;
+
+
+    button.addEventListener(
+        "click",
+        async () => {
+
+            button.disabled = true;
+
+            button.textContent =
+                "Loading...";
+
+
+            await loadSessions();
+
+
+            button.disabled = false;
+
+            button.innerHTML =
+                "↻ Refresh";
+
+        }
+    );
 
 }
 
@@ -678,7 +990,7 @@ async function removeSession(userId) {
 
     const confirmed =
         confirm(
-            "Remove this WhatsApp session?"
+            "Disconnect this WhatsApp session?"
         );
 
 
@@ -689,29 +1001,27 @@ async function removeSession(userId) {
 
         const response =
             await fetch(
+
                 `/api/sessions/${encodeURIComponent(userId)}`,
+
                 {
                     method: "DELETE"
                 }
+
             );
-
-
-        const data =
-            await response.json();
 
 
         if (!response.ok) {
 
             throw new Error(
-                data.error ||
-                "Failed to remove session"
+                "Failed to disconnect session"
             );
 
         }
 
 
         showToast(
-            "Session removed successfully"
+            "Session disconnected successfully"
         );
 
 
@@ -726,8 +1036,7 @@ async function removeSession(userId) {
 
 
         showToast(
-            error.message ||
-            "Failed to remove session",
+            "Failed to disconnect session",
             "error"
         );
 
@@ -736,24 +1045,39 @@ async function removeSession(userId) {
 }
 
 
-                    
 /* ==========================================
-   PAIRING CODE SYSTEM
+   PAIRING SYSTEM
 ========================================== */
 
 function initializePairingButton() {
 
     const pairingForm =
-        document.getElementById("pairingForm");
+        document.getElementById(
+            "pairingForm"
+        );
+
 
     const generateBtn =
-        document.getElementById("generatePairBtn");
+        document.getElementById(
+            "generatePairBtn"
+        );
+
 
     const phoneInput =
-        document.getElementById("phoneNumber");
+        document.getElementById(
+            "phoneNumber"
+        );
 
 
-    if (!pairingForm || !generateBtn) return;
+    if (
+        !pairingForm ||
+        !generateBtn ||
+        !phoneInput
+    ) {
+
+        return;
+
+    }
 
 
     pairingForm.addEventListener(
@@ -764,9 +1088,9 @@ function initializePairingButton() {
 
 
             const phoneNumber =
-                phoneInput
-                    ? phoneInput.value.trim()
-                    : "";
+                phoneInput.value
+                    .replace(/\D/g, "")
+                    .trim();
 
 
             if (!phoneNumber) {
@@ -780,20 +1104,13 @@ function initializePairingButton() {
             }
 
 
-            const cleanNumber =
-                phoneNumber.replace(
-                    /[^0-9]/g,
-                    ""
-                );
-
-
             if (
-                cleanNumber.length < 8 ||
-                cleanNumber.length > 16
+                phoneNumber.length < 8 ||
+                phoneNumber.length > 16
             ) {
 
                 showPairingError(
-                    "Enter a valid WhatsApp number with country code."
+                    "Enter a valid number with country code."
                 );
 
                 return;
@@ -801,26 +1118,10 @@ function initializePairingButton() {
             }
 
 
-            /* Hide Previous Results */
-
             hidePairingError();
 
+            hidePairingResult();
 
-            const pairingResult =
-                document.getElementById(
-                    "pairingResult"
-                );
-
-            if (pairingResult) {
-
-                pairingResult.classList.add(
-                    "hidden"
-                );
-
-            }
-
-
-            /* Loading Button */
 
             generateBtn.disabled = true;
 
@@ -834,55 +1135,59 @@ function initializePairingButton() {
                     await fetch(
                         API.pair,
                         {
+
                             method: "POST",
 
                             headers: {
+
                                 "Content-Type":
                                     "application/json"
+
                             },
 
                             body:
                                 JSON.stringify({
-                                    phoneNumber:
-                                        cleanNumber
+
+                                    phoneNumber
+
                                 })
+
                         }
                     );
 
 
-                const data =
-                    await response.json();
+                let data;
+
+
+                try {
+
+                    data =
+                        await response.json();
+
+                } catch {
+
+                    throw new Error(
+                        "Invalid server response"
+                    );
+
+                }
 
 
                 if (!response.ok) {
 
                     throw new Error(
                         data.error ||
+                        data.message ||
                         "Failed to generate pairing code"
                     );
 
                 }
 
 
-                /* Already Connected */
-
-                if (data.alreadyRegistered) {
-
-                    showPairingError(
-                        data.message ||
-                        "This number is already connected."
-                    );
-
-                    return;
-
-                }
-
-
-                /* Show Pairing Code */
-
                 const code =
                     data.code ||
-                    data.pairingCode;
+                    data.pairingCode ||
+                    data.pairCode;
 
 
                 if (!code) {
@@ -900,11 +1205,6 @@ function initializePairingButton() {
                 showToast(
                     "Pairing code generated successfully"
                 );
-
-
-                /* Refresh Sessions */
-
-                await loadSessions();
 
 
             } catch (error) {
@@ -925,13 +1225,133 @@ function initializePairingButton() {
                 generateBtn.disabled = false;
 
                 generateBtn.innerHTML = `
+
                     <span>🔑</span>
+
                     Generate Pair Code
+
                 `;
 
             }
 
         }
+    );
+
+}
+
+
+/* ==========================================
+   SHOW PAIRING CODE
+========================================== */
+
+function showPairingCode(code) {
+
+    const pairingResult =
+        document.getElementById(
+            "pairingResult"
+        );
+
+
+    const pairCode =
+        document.getElementById(
+            "pairCode"
+        );
+
+
+    if (pairCode) {
+
+        pairCode.textContent =
+            String(code);
+
+    }
+
+
+    if (pairingResult) {
+
+        pairingResult.classList.remove(
+            "hidden"
+        );
+
+
+        pairingResult.scrollIntoView({
+
+            behavior: "smooth",
+
+            block: "center"
+
+        });
+
+    }
+
+}
+
+
+/* ==========================================
+   HIDE PAIRING RESULT
+========================================== */
+
+function hidePairingResult() {
+
+    const result =
+        document.getElementById(
+            "pairingResult"
+        );
+
+
+    if (result) {
+
+        result.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+/* ==========================================
+   PAIRING ERROR
+========================================== */
+
+function showPairingError(message) {
+
+    const errorBox =
+        document.getElementById(
+            "pairingError"
+        );
+
+
+    if (!errorBox) return;
+
+
+    errorBox.textContent =
+        message;
+
+
+    errorBox.classList.remove(
+        "hidden"
+    );
+
+}
+
+
+function hidePairingError() {
+
+    const errorBox =
+        document.getElementById(
+            "pairingError"
+        );
+
+
+    if (!errorBox) return;
+
+
+    errorBox.textContent =
+        "";
+
+
+    errorBox.classList.add(
+        "hidden"
     );
 
 }
@@ -944,10 +1364,15 @@ function initializePairingButton() {
 function initializeCopyButton() {
 
     const copyBtn =
-        document.getElementById("copyPairCode");
+        document.getElementById(
+            "copyPairCode"
+        );
+
 
     const pairCode =
-        document.getElementById("pairCode");
+        document.getElementById(
+            "pairCode"
+        );
 
 
     if (!copyBtn || !pairCode) return;
@@ -963,7 +1388,7 @@ function initializeCopyButton() {
 
             if (
                 !code ||
-                code === "NOT AVAILABLE"
+                code === "---- ----"
             ) {
 
                 showToast(
@@ -983,7 +1408,7 @@ function initializeCopyButton() {
                 );
 
 
-                copyBtn.textContent =
+                copyBtn.innerHTML =
                     "✓ Copied";
 
 
@@ -994,17 +1419,13 @@ function initializeCopyButton() {
 
                 setTimeout(() => {
 
-                    copyBtn.textContent =
-                        "Copy Code";
+                    copyBtn.innerHTML =
+                        "📋 Copy Code";
 
                 }, 2000);
 
-            } catch (error) {
 
-                console.error(
-                    "[COPY ERROR]",
-                    error
-                );
+            } catch (error) {
 
                 showToast(
                     "Failed to copy code",
@@ -1023,16 +1444,15 @@ function initializeCopyButton() {
    LOAD COMMANDS
 ========================================== */
 
-let allCommands = [];
-
-
 async function loadCommands() {
 
-    const commandsGrid =
-        document.getElementById("commandsGrid");
+    const commandsList =
+        document.getElementById(
+            "commandsList"
+        );
 
 
-    if (!commandsGrid) return;
+    if (!commandsList) return;
 
 
     try {
@@ -1040,31 +1460,49 @@ async function loadCommands() {
         const response =
             await fetch(API.commands);
 
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Failed to load commands"
+            );
+
+        }
+
+
         const data =
             await response.json();
 
 
         allCommands =
-            data.commands || [];
+            Array.isArray(data)
+                ? data
+                : (
+                    data.commands || []
+                );
 
 
         updateText(
-            "commandsCount",
+            "totalCommands",
             allCommands.length
         );
 
 
-        renderCommands(allCommands);
+        renderCommands(
+            allCommands
+        );
+
 
     } catch (error) {
 
         console.error(
-            "[COMMANDS ERROR]",
+            "[COMMAND ERROR]",
             error
         );
 
 
-        commandsGrid.innerHTML = `
+        commandsList.innerHTML = `
+
             <div class="empty-state">
 
                 <span>⚠️</span>
@@ -1074,6 +1512,7 @@ async function loadCommands() {
                 </h3>
 
             </div>
+
         `;
 
     }
@@ -1081,18 +1520,25 @@ async function loadCommands() {
 }
 
 
+/* ==========================================
+   RENDER COMMANDS
+========================================== */
+
 function renderCommands(commands) {
 
-    const commandsGrid =
-        document.getElementById("commandsGrid");
+    const commandsList =
+        document.getElementById(
+            "commandsList"
+        );
 
 
-    if (!commandsGrid) return;
+    if (!commandsList) return;
 
 
     if (!commands.length) {
 
-        commandsGrid.innerHTML = `
+        commandsList.innerHTML = `
+
             <div class="empty-state">
 
                 <span>⌨️</span>
@@ -1102,6 +1548,7 @@ function renderCommands(commands) {
                 </h3>
 
             </div>
+
         `;
 
         return;
@@ -1109,7 +1556,7 @@ function renderCommands(commands) {
     }
 
 
-    commandsGrid.innerHTML =
+    commandsList.innerHTML =
         commands.map(command => {
 
             const name =
@@ -1118,32 +1565,38 @@ function renderCommands(commands) {
                 "Unknown";
 
 
-            const category =
-                command.category ||
-                "General";
-
-
             const description =
                 command.description ||
                 "No description available.";
 
 
+            const category =
+                command.category ||
+                "General";
+
+
             return `
+
                 <div class="command-card">
 
                     <div class="command-name">
                         .${escapeHTML(name)}
                     </div>
 
-                    <div class="command-category">
-                        ${escapeHTML(category)}
-                    </div>
-
                     <div class="command-description">
+
+                        <strong>
+                            ${escapeHTML(category)}
+                        </strong>
+
+                        <br>
+
                         ${escapeHTML(description)}
+
                     </div>
 
                 </div>
+
             `;
 
         }).join("");
@@ -1158,7 +1611,9 @@ function renderCommands(commands) {
 function initializeCommandSearch() {
 
     const searchInput =
-        document.getElementById("commandSearch");
+        document.getElementById(
+            "commandSearch"
+        );
 
 
     if (!searchInput) return;
@@ -1177,41 +1632,24 @@ function initializeCommandSearch() {
             const filtered =
                 allCommands.filter(command => {
 
-                    const name =
-                        (
-                            command.name ||
-                            command.command ||
-                            ""
-                        )
-                        .toLowerCase();
+                    const text =
+                        `${command.name || ""}
+                         ${command.command || ""}
+                         ${command.category || ""}
+                         ${command.description || ""}`
+                            .toLowerCase();
 
 
-                    const category =
-                        (
-                            command.category ||
-                            ""
-                        )
-                        .toLowerCase();
-
-
-                    const description =
-                        (
-                            command.description ||
-                            ""
-                        )
-                        .toLowerCase();
-
-
-                    return (
-                        name.includes(query) ||
-                        category.includes(query) ||
-                        description.includes(query)
+                    return text.includes(
+                        query
                     );
 
                 });
 
 
-            renderCommands(filtered);
+            renderCommands(
+                filtered
+            );
 
         }
     );
@@ -1230,6 +1668,7 @@ async function loadFeatures() {
         const response =
             await fetch(API.features);
 
+
         if (!response.ok) return;
 
 
@@ -1238,38 +1677,40 @@ async function loadFeatures() {
 
 
         const features =
-            data.features ||
-            data;
+            data.features || data;
 
 
-        Object.keys(features).forEach(
-            featureName => {
+        document
+            .querySelectorAll(
+                "[data-setting]"
+            )
+            .forEach(toggle => {
 
-                const checkbox =
-                    document.querySelector(
-                        `[data-feature="${featureName}"]`
-                    );
+                const name =
+                    toggle.dataset.setting;
 
 
-                if (checkbox) {
+                if (
+                    Object.prototype.hasOwnProperty.call(
+                        features,
+                        name
+                    )
+                ) {
 
-                    checkbox.checked =
+                    toggle.checked =
                         Boolean(
-                            features[featureName]
+                            features[name]
                         );
 
                 }
 
-            }
-        );
+            });
 
-
-        initializeFeatureSwitches();
 
     } catch (error) {
 
         console.error(
-            "[FEATURES ERROR]",
+            "[FEATURE ERROR]",
             error
         );
 
@@ -1279,31 +1720,29 @@ async function loadFeatures() {
 
 
 /* ==========================================
-   AUTO FEATURE SWITCHES
+   FEATURE SWITCHES
 ========================================== */
-
-let featureListenersInitialized = false;
-
 
 function initializeFeatureSwitches() {
 
     if (featureListenersInitialized) return;
 
 
-    const featureSwitches =
+    const switches =
         document.querySelectorAll(
-            "[data-feature]"
+            "[data-setting]"
         );
 
 
-    featureSwitches.forEach(toggle => {
+    switches.forEach(toggle => {
 
         toggle.addEventListener(
             "change",
             async () => {
 
                 const featureName =
-                    toggle.dataset.feature;
+                    toggle.dataset.setting;
+
 
                 const enabled =
                     toggle.checked;
@@ -1315,17 +1754,23 @@ function initializeFeatureSwitches() {
                         await fetch(
                             `${API.features}/${featureName}`,
                             {
+
                                 method: "POST",
 
                                 headers: {
+
                                     "Content-Type":
                                         "application/json"
+
                                 },
 
                                 body:
                                     JSON.stringify({
+
                                         enabled
+
                                     })
+
                             }
                         );
 
@@ -1333,27 +1778,24 @@ function initializeFeatureSwitches() {
                     if (!response.ok) {
 
                         throw new Error(
-                            "Failed to update feature"
+                            "Feature update failed"
                         );
 
                     }
 
 
                     showToast(
+
                         `${featureName} ${
                             enabled
                                 ? "enabled"
                                 : "disabled"
                         }`
+
                     );
+
 
                 } catch (error) {
-
-                    console.error(
-                        "[FEATURE UPDATE ERROR]",
-                        error
-                    );
-
 
                     toggle.checked =
                         !enabled;
@@ -1372,7 +1814,103 @@ function initializeFeatureSwitches() {
     });
 
 
-    featureListenersInitialized = true;
+    featureListenersInitialized =
+        true;
+
+}
+
+
+/* ==========================================
+   LOAD SETTINGS
+========================================== */
+
+async function loadSettings() {
+
+    try {
+
+        const response =
+            await fetch(API.settings);
+
+
+        if (!response.ok) return;
+
+
+        const data =
+            await response.json();
+
+
+        updateText(
+            "settingBotName",
+            data.botName ||
+            data.BOT_NAME ||
+            "DRIP QUEEN MD"
+        );
+
+
+        updateText(
+            "settingVersion",
+            data.version ||
+            data.BOT_VERSION ||
+            "1.0.0"
+        );
+
+
+        updateText(
+            "settingCreator",
+            data.creator ||
+            data.CREATOR ||
+            "NOX STAR TECH"
+        );
+
+
+        updateText(
+            "settingPrefix",
+            data.prefix ||
+            data.PREFIX ||
+            "."
+        );
+
+
+        updateText(
+            "settingMode",
+            (
+                data.mode ||
+                data.MODE ||
+                "public"
+            ).toUpperCase()
+        );
+
+
+        updateText(
+            "nodeVersion",
+            data.nodeVersion ||
+            data.node ||
+            "Node.js"
+        );
+
+
+        updateText(
+            "platform",
+            data.platform ||
+            navigator.platform
+        );
+
+
+        updateText(
+            "databaseStatus",
+            data.database ||
+            "🟢 Connected"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "[SETTINGS ERROR]",
+            error
+        );
+
+    }
 
 }
 
@@ -1389,7 +1927,8 @@ function updateText(id, value) {
 
     if (element) {
 
-        element.textContent = value;
+        element.textContent =
+            value;
 
     }
 
@@ -1403,16 +1942,22 @@ function updateText(id, value) {
 function formatUptime(seconds) {
 
     seconds =
-        Math.floor(Number(seconds) || 0);
+        Math.floor(
+            Number(seconds) || 0
+        );
 
 
     const days =
-        Math.floor(seconds / 86400);
+        Math.floor(
+            seconds / 86400
+        );
+
 
     const hours =
         Math.floor(
             (seconds % 86400) / 3600
         );
+
 
     const minutes =
         Math.floor(
@@ -1434,22 +1979,34 @@ function formatUptime(seconds) {
     }
 
 
-    return `${minutes}m`;
+    if (minutes > 0) {
+
+        return `${minutes}m`;
+
+    }
+
+
+    return `${seconds}s`;
 
 }
 
 
 /* ==========================================
-   HELPER: ESCAPE HTML
+   ESCAPE HTML
 ========================================== */
 
 function escapeHTML(value) {
 
     return String(value)
+
         .replace(/&/g, "&amp;")
+
         .replace(/</g, "&lt;")
+
         .replace(/>/g, "&gt;")
+
         .replace(/"/g, "&quot;")
+
         .replace(/'/g, "&#039;");
 
 }
@@ -1458,6 +2015,7 @@ function escapeHTML(value) {
 function escapeAttribute(value) {
 
     return escapeHTML(value)
+
         .replace(/`/g, "&#096;");
 
 }
@@ -1475,8 +2033,7 @@ function showToast(
     if (!toast) {
 
         console.log(
-            `[${type.toUpperCase()}]`,
-            message
+            `[${type}] ${message}`
         );
 
         return;
@@ -1484,7 +2041,23 @@ function showToast(
     }
 
 
-    toast.textContent = message;
+    const toastMessage =
+        document.getElementById(
+            "toastMessage"
+        );
+
+
+    if (toastMessage) {
+
+        toastMessage.textContent =
+            message;
+
+    } else {
+
+        toast.textContent =
+            message;
+
+    }
 
 
     toast.classList.remove(
@@ -1523,7 +2096,7 @@ function showToast(
 
 
 /* ==========================================
-   MAKE FUNCTIONS GLOBAL
+   GLOBAL FUNCTIONS
 ========================================== */
 
 window.removeSession =
