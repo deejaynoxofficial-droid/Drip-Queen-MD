@@ -765,16 +765,17 @@ button {
 
 
 .welcome-card h2 span {
-    background:
-        linear-gradient(
-            90deg,
-            var(--purple-light),
-            var(--blue)
-        );
+    background: linear-gradient(
+        90deg,
+        var(--purple-light),
+        var(--blue)
+    );
 
     -webkit-background-clip: text;
+    background-clip: text;
 
     color: transparent;
+    -webkit-text-fill-color: transparent;
 }
 
 
