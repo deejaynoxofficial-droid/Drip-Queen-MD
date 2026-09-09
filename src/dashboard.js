@@ -4,6 +4,48 @@ const fs = require("fs");
 
 const config = require("../config");
 
+/*
+   Optional persistent bot worker URL.
+   On Vercel, dashboard requests can be proxied to the
+   persistent Render/Railway/VPS worker. Leave this unset
+   on the worker itself so requests are handled locally.
+*/
+const BOT_WORKER_URL = String(process.env.BOT_WORKER_URL || "")
+    .trim()
+    .replace(/\/+$/, "");
+
+async function workerRequest(endpoint, options = {}) {
+    if (!BOT_WORKER_URL) {
+        throw new Error("BOT_WORKER_URL is not configured");
+    }
+
+    const response = await fetch(
+        `${BOT_WORKER_URL}${endpoint}`,
+        {
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                ...(options.headers || {})
+            }
+        }
+    );
+
+    const text = await response.text();
+    let data;
+
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch {
+        data = { error: text || "Worker returned an invalid response" };
+    }
+
+    if (!response.ok) {
+        throw new Error(data.error || `Worker request failed (${response.status})`);
+    }
+
+    return data;
+}
+
 
 /* ==========================================
    SAFE MODULE LOADER
@@ -170,6 +212,11 @@ function createDashboard(app) {
 
             try {
 
+                if (BOT_WORKER_URL) {
+                    const workerStatus = await workerRequest("/api/status");
+                    return res.json(workerStatus);
+                }
+
                 const sessions =
                     await getSessions();
 
@@ -236,6 +283,11 @@ function createDashboard(app) {
         async (req, res) => {
 
             try {
+
+                if (BOT_WORKER_URL) {
+                    const workerSessions = await workerRequest("/api/sessions");
+                    return res.json(workerSessions);
+                }
 
                 const sessions =
                     await getSessions();
@@ -524,9 +576,14 @@ function createDashboard(app) {
 
     app.get(
         "/api/features",
-        (req, res) => {
+        async (req, res) => {
 
             try {
+
+                if (BOT_WORKER_URL) {
+                    const workerFeatures = await workerRequest("/api/features");
+                    return res.json(workerFeatures);
+                }
 
                 const features =
                     getFeatureSettings();
@@ -569,9 +626,17 @@ function createDashboard(app) {
 
     app.post(
         "/api/features/:featureName",
-        (req, res) => {
+        async (req, res) => {
 
             try {
+
+                if (BOT_WORKER_URL) {
+                    const workerFeatures = await workerRequest(
+                        `/api/features/${encodeURIComponent(req.params.featureName)}`,
+                        { method: "POST", body: JSON.stringify(req.body || {}) }
+                    );
+                    return res.json(workerFeatures);
+                }
 
                 const featureName =
                     req.params.featureName;
@@ -678,9 +743,14 @@ function createDashboard(app) {
 
     app.get(
         "/api/settings",
-        (req, res) => {
+        async (req, res) => {
 
             try {
+
+                if (BOT_WORKER_URL) {
+                    const workerSettings = await workerRequest("/api/settings");
+                    return res.json(workerSettings);
+                }
 
                 const settings =
                     readSettingsFile();
@@ -717,9 +787,17 @@ function createDashboard(app) {
 
     app.post(
         "/api/settings",
-        (req, res) => {
+        async (req, res) => {
 
             try {
+
+                if (BOT_WORKER_URL) {
+                    const workerSettings = await workerRequest(
+                        "/api/settings",
+                        { method: "POST", body: JSON.stringify(req.body || {}) }
+                    );
+                    return res.json(workerSettings);
+                }
 
                 const currentSettings =
                     readSettingsFile();
@@ -844,6 +922,17 @@ function createDashboard(app) {
 async function generatePairingCode(
     phoneNumber
 ) {
+
+    if (BOT_WORKER_URL) {
+        const result = await workerRequest(
+            "/api/pair",
+            {
+                method: "POST",
+                body: JSON.stringify({ phoneNumber })
+            }
+        );
+        return result;
+    }
 
     if (!newSession) {
 
@@ -1154,6 +1243,19 @@ async function deleteSession(
 
         return false;
 
+    }
+
+    if (BOT_WORKER_URL) {
+        try {
+            const result = await workerRequest(
+                `/api/sessions/${encodeURIComponent(userId)}`,
+                { method: "DELETE" }
+            );
+            return result.success !== false;
+        } catch (error) {
+            console.error("[WORKER DELETE SESSION ERROR]", error.message);
+            return false;
+        }
     }
 
 

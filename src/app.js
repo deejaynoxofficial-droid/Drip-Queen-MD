@@ -570,7 +570,7 @@ app.post(
 
 
             const result =
-                await newSession.createNewSession(
+                await newSession.generatePairingCode(
                     phoneNumber
                 );
 

@@ -1668,12 +1668,98 @@ async function shutdown() {
 
 
 /* ==========================================
+   GENERATE PAIRING CODE
+========================================== */
+
+async function generatePairingCode(phoneNumber) {
+    const userId = String(phoneNumber || "").replace(/\D/g, "");
+
+    if (userId.length < 8 || userId.length > 16) {
+        throw new Error("Enter a valid phone number with country code.");
+    }
+
+    if (activeSessions.has(userId)) {
+        throw new Error("This number already has an active session.");
+    }
+
+    clearReconnectTimer(userId);
+    connectingSessions.add(userId);
+
+    const sessionPath = path.join(config.SESSIONS_PATH, userId);
+    fs.mkdirSync(sessionPath, { recursive: true });
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+
+    if (state.creds.registered) {
+        connectingSessions.delete(userId);
+        throw new Error("This number already has saved WhatsApp credentials.");
+    }
+
+    const { version } = await fetchLatestBaileysVersion();
+
+    const sock = makeWASocket({
+        version,
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(
+                state.keys,
+                pino({ level: "silent" })
+            )
+        },
+        logger: pino({ level: "silent" }),
+        browser: [config.BOT_NAME || "DRIP QUEEN MD", "Chrome", "1.0.0"],
+        printQRInTerminal: false,
+        markOnlineOnConnect: true,
+        syncFullHistory: false,
+        generateHighQualityLinkPreview: true
+    });
+
+    activeSessions.set(userId, sock);
+    sock.ev.on("creds.update", saveCreds);
+    attachSessionHandlers(userId, sock);
+
+    sock.ev.on("connection.update", update => {
+        const { connection, lastDisconnect } = update;
+
+        if (connection === "open") {
+            connectingSessions.delete(userId);
+            console.log(`[PAIRING] ${userId} connected successfully`);
+            return;
+        }
+
+        if (connection === "close") {
+            activeSessions.delete(userId);
+            connectingSessions.delete(userId);
+
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            if (statusCode === DisconnectReason.loggedOut) {
+                clearReconnectTimer(userId);
+            }
+        }
+    });
+
+    // Give the socket a moment to initialize before requesting the code.
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    try {
+        const code = await sock.requestPairingCode(userId);
+        return { number: userId, code };
+    } catch (error) {
+        activeSessions.delete(userId);
+        connectingSessions.delete(userId);
+        throw error;
+    }
+}
+
+/* ==========================================
    EXPORT
 ========================================== */
 
 module.exports = {
 
     connectSession,
+
+    generatePairingCode,
 
     createSession:
         connectSession,

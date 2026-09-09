@@ -1422,6 +1422,19 @@ function getSessions() {
 
 
 /* ==========================================
+   SESSION STATS
+========================================== */
+
+function getSessionStats() {
+    return {
+        active: activeSessions.size,
+        connecting: connectingSessions.size,
+        total: activeSessions.size + connectingSessions.size
+    };
+}
+
+
+/* ==========================================
    REMOVE SESSION
 ========================================== */
 
@@ -1623,6 +1636,8 @@ module.exports = {
 
 
     getSessions,
+
+    getSessionStats,
 
     getActiveSessions:
         getSessions,
