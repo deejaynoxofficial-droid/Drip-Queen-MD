@@ -183,7 +183,7 @@ DRIP-QUEEN-MD/
 
 Before installing DRIP QUEEN MD, make sure you have:
 
-* 🟢 Node.js 18+
+* 🟢 Node.js 20+
 * 📦 npm
 * 📱 A WhatsApp account
 * 🌐 Internet connection
@@ -233,6 +233,40 @@ Or:
 ```bash
 node index.js
 ```
+
+---
+
+# ☁️ Recommended Hosting Architecture
+
+DRIP QUEEN MD uses a persistent WhatsApp connection and local session files. For reliable multi-session operation, run the **bot worker** on a persistent Node.js host such as Render, Railway, or a VPS.
+
+Vercel should be used as the **dashboard/API proxy** only.
+
+### Persistent worker
+
+```text
+npm install
+npm start
+```
+
+Required worker environment:
+
+```env
+PORT=3000
+HOST=0.0.0.0
+```
+
+### Vercel dashboard
+
+Set this environment variable in the Vercel project:
+
+```env
+BOT_WORKER_URL=https://YOUR-WORKER-DOMAIN
+```
+
+The Vercel dashboard then proxies status, sessions, pairing, commands, features, and settings requests to the persistent worker.
+
+> Do not rely on Vercel's temporary filesystem for WhatsApp session storage.
 
 ---
 
