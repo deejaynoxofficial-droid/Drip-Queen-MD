@@ -21,10 +21,22 @@ try {
 
 
 let baileysModule = null;
+let makeWASocket;
+let useMultiFileAuthState;
+let DisconnectReason;
+let fetchLatestBaileysVersion;
+let makeCacheableSignalKeyStore;
 
 async function loadBaileys() {
     if (!baileysModule) {
         baileysModule = await import("@whiskeysockets/baileys");
+        ({
+            default: makeWASocket,
+            useMultiFileAuthState,
+            DisconnectReason,
+            fetchLatestBaileysVersion,
+            makeCacheableSignalKeyStore
+        } = baileysModule);
     }
     return baileysModule;
 }
@@ -256,13 +268,7 @@ function registerSession(
 
 async function connectSession(userId) {
 
-    const {
-        default: makeWASocket,
-        useMultiFileAuthState,
-        DisconnectReason,
-        fetchLatestBaileysVersion,
-        makeCacheableSignalKeyStore
-    } = await loadBaileys();
+    await loadBaileys();
 
     try {
 
@@ -1681,6 +1687,8 @@ async function shutdown() {
 ========================================== */
 
 async function generatePairingCode(phoneNumber) {
+    await loadBaileys();
+
     const userId = String(phoneNumber || "").replace(/\D/g, "");
 
     if (userId.length < 8 || userId.length > 16) {
