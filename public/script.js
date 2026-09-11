@@ -24,6 +24,15 @@ const FEATURE_ALIASES = {
 
 let apiOnline = false;
 
+const PAGE_META = {
+    home: ["Dashboard", "Overview and live bot status"],
+    pairing: ["Connect WhatsApp", "Generate a secure WhatsApp pairing code"],
+    sessions: ["Connected Users", "Manage connected WhatsApp sessions"],
+    autofeatures: ["Auto Features", "Control automated bot features"],
+    commands: ["Commands", "Browse commands loaded from the Commands folder"],
+    settings: ["Settings", "Configure your bot" ]
+};
+
 /* ==========================================
    API REQUEST HELPER
 ========================================== */
@@ -92,20 +101,27 @@ async function loadStatus() {
 
         if (data.uptime !== undefined) {
             updateElement("uptime", formatUptime(data.uptime));
+            updateElement("serverUptime", formatUptime(data.uptime));
         }
 
         if (data.sessions !== undefined) {
             updateElement("sessionCount", data.sessions);
+            updateElement("totalUsers", data.sessions);
+            updateElement("activeSessions", data.sessions);
         }
 
         if (data.commands !== undefined) {
             updateElement("commandCount", data.commands);
+            updateElement("totalCommands", data.commands);
         }
 
         setServerStatus(true, data.status || "online");
+        updateElement("pairingServerStatus", "Ready");
+        updateElement("activeSessions", data.sessions ?? 0);
     } catch (error) {
         console.error("[STATUS ERROR]", error.message);
         setServerStatus(false, "offline");
+        updateElement("pairingServerStatus", "Offline");
     }
 }
 
@@ -216,7 +232,19 @@ async function generatePairingCode() {
         return;
     }
 
+    const button = document.getElementById("generatePairBtn");
+
     try {
+        if (button) {
+            button.disabled = true;
+            button.dataset.originalText = button.textContent;
+            button.textContent = "Generating...";
+        }
+        const errorBox = document.getElementById("pairingError");
+        if (errorBox) {
+            errorBox.classList.add("hidden");
+            errorBox.textContent = "";
+        }
         if (result) result.textContent = "Generating pairing code...";
         if (pairCode) {
             pairCode.textContent = "--------";
@@ -242,6 +270,8 @@ async function generatePairingCode() {
         }
 
         if (pairCode) pairCode.textContent = formatPairingCode(code);
+        const resultBox = document.getElementById("pairingResult");
+        if (resultBox) resultBox.classList.remove("hidden");
         if (result) {
             result.textContent =
                 "Open WhatsApp → Linked devices → Link a device → Link with phone number";
@@ -252,7 +282,17 @@ async function generatePairingCode() {
     } catch (error) {
         if (result) result.textContent = `Error: ${error.message}`;
         if (pairCode) pairCode.textContent = "--------";
+        const errorBox = document.getElementById("pairingError");
+        if (errorBox) {
+            errorBox.textContent = error.message;
+            errorBox.classList.remove("hidden");
+        }
         showToast(error.message, "error");
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = button.dataset.originalText || "Generate Pair Code";
+        }
     }
 }
 
@@ -463,6 +503,19 @@ async function saveSettings() {
     }
 }
 
+function initializeCommandSearch() {
+    const input = document.getElementById("commandSearch");
+    const list = document.getElementById("commandsList");
+    if (!input || !list) return;
+
+    input.addEventListener("input", () => {
+        const query = input.value.trim().toLowerCase();
+        list.querySelectorAll(".command-item").forEach(item => {
+            item.style.display = item.textContent.toLowerCase().includes(query) ? "" : "none";
+        });
+    });
+}
+
 function initializeSettingsControls() {
     const form = document.getElementById("settingsForm");
 
@@ -485,6 +538,11 @@ function initializeNavigation() {
     for (const item of navItems) {
         item.addEventListener("click", () => {
             const target = item.dataset.page;
+            const meta = PAGE_META[target];
+            if (meta) {
+                updateElement("pageTitle", meta[0]);
+                updateElement("pageSubtitle", meta[1]);
+            }
 
             navItems.forEach(nav => nav.classList.remove("active"));
             item.classList.add("active");
@@ -537,6 +595,28 @@ function initializeButtons() {
         refreshButton.addEventListener("click", refreshDashboard);
     }
 
+    const refreshSessionsButton = document.getElementById("refreshSessionsBtn");
+    if (refreshSessionsButton) {
+        refreshSessionsButton.addEventListener("click", loadSessions);
+    }
+
+    const copyPairButton = document.getElementById("copyPairCode");
+    if (copyPairButton) {
+        copyPairButton.addEventListener("click", async () => {
+            const code = document.getElementById("pairCode")?.textContent?.trim();
+            if (!code || /^[-\s]+$/.test(code)) {
+                showToast("Generate a pairing code first", "error");
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(code.replace(/[^A-Za-z0-9]/g, ""));
+                showToast("Pairing code copied", "success");
+            } catch {
+                showToast("Could not copy automatically. Select the code and copy it.", "error");
+            }
+        });
+    }
+
     document.querySelectorAll("[data-action='refresh']").forEach(button => {
         button.addEventListener("click", refreshDashboard);
     });
@@ -568,6 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeButtons();
     initializeFeatureControls();
     initializeSettingsControls();
+    initializeCommandSearch();
 
     // Never block the UI on an API call.
     refreshDashboard().catch(error => {
