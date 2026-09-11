@@ -14,7 +14,7 @@ const botImagePath =
         "..",
         "..",
         "assets",
-        "bot.jpg"
+        "bot.png"
     );
 
 
