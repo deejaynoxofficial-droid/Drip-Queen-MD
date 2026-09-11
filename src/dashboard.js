@@ -19,16 +19,21 @@ async function workerRequest(endpoint, options = {}) {
         throw new Error("BOT_WORKER_URL is not configured");
     }
 
-    const response = await fetch(
-        `${BOT_WORKER_URL}${endpoint}`,
-        {
-            ...options,
-            headers: {
-                "Content-Type": "application/json",
-                ...(options.headers || {})
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+        const response = await fetch(
+            `${BOT_WORKER_URL}${endpoint}`,
+            {
+                ...options,
+                signal: controller.signal,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                }
             }
-        }
-    );
+        );
 
     const text = await response.text();
     let data;
@@ -44,6 +49,9 @@ async function workerRequest(endpoint, options = {}) {
     }
 
     return data;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
 
@@ -856,6 +864,24 @@ function createDashboard(app) {
                     newSettings
                 );
 
+                // Apply editable settings immediately to the running worker.
+                // This keeps the dashboard and bot runtime in sync without
+                // requiring a restart.
+                if (typeof newSettings.botName === "string" && newSettings.botName.trim()) {
+                    config.BOT_NAME = newSettings.botName.trim();
+                }
+
+                if (typeof newSettings.prefix === "string" && newSettings.prefix.trim()) {
+                    config.PREFIX = newSettings.prefix.trim();
+                }
+
+                if (typeof newSettings.mode === "string" && newSettings.mode.trim()) {
+                    config.MODE = newSettings.mode.trim().toLowerCase();
+                }
+
+                if (typeof newSettings.creator === "string" && newSettings.creator.trim()) {
+                    config.CREATOR = newSettings.creator.trim();
+                }
 
                 res.json({
 
