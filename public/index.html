@@ -852,7 +852,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="antilink"
+                                    data-feature="antiLink"
                                 >
 
                                 <span class="slider"></span>
@@ -892,7 +892,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="antidelete"
+                                    data-feature="antiDelete"
                                 >
 
                                 <span class="slider"></span>
@@ -932,7 +932,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="autoreact"
+                                    data-feature="autoReact"
                                 >
 
                                 <span class="slider"></span>
@@ -972,7 +972,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="autoreply"
+                                    data-feature="autoReply"
                                 >
 
                                 <span class="slider"></span>
@@ -1012,7 +1012,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="autotyping"
+                                    data-feature="autoTyping"
                                 >
 
                                 <span class="slider"></span>
@@ -1052,7 +1052,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="autorecording"
+                                    data-feature="autoRecording"
                                 >
 
                                 <span class="slider"></span>
@@ -1091,7 +1091,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="welcome"
+                                    data-feature="welcome"
                                 >
 
                                 <span class="slider"></span>
@@ -1130,7 +1130,7 @@
 
                                 <input
                                     type="checkbox"
-                                    data-setting="goodbye"
+                                    data-feature="goodbye"
                                 >
 
                                 <span class="slider"></span>
@@ -1322,6 +1322,52 @@
 
                         </div>
 
+                    </div>
+
+
+                    <!-- EDIT BOT SETTINGS -->
+
+                    <div class="section-card">
+                        <div class="section-header">
+                            <div>
+                                <h2>🛠️ Edit Bot Settings</h2>
+                                <p>Changes are saved through the bot API.</p>
+                            </div>
+                        </div>
+
+                        <form id="settingsForm" class="settings-info">
+                            <div class="input-group">
+                                <label for="botNameInput">Bot Name</label>
+                                <input
+                                    id="botNameInput"
+                                    type="text"
+                                    maxlength="60"
+                                    placeholder="DRIP QUEEN MD"
+                                >
+                            </div>
+
+                            <div class="input-group">
+                                <label for="prefixInput">Command Prefix</label>
+                                <input
+                                    id="prefixInput"
+                                    type="text"
+                                    maxlength="5"
+                                    placeholder="."
+                                >
+                            </div>
+
+                            <div class="input-group">
+                                <label for="modeInput">Mode</label>
+                                <select id="modeInput">
+                                    <option value="PUBLIC">PUBLIC</option>
+                                    <option value="PRIVATE">PRIVATE</option>
+                                </select>
+                            </div>
+
+                            <button class="btn-primary" type="submit">
+                                💾 Save Settings
+                            </button>
+                        </form>
                     </div>
 
 
