@@ -27,7 +27,6 @@ let apiOnline = false;
 const PAGE_META = {
     home: ["Dashboard", "Overview and live bot status"],
     pairing: ["Connect WhatsApp", "Generate a secure WhatsApp pairing code"],
-    sessions: ["Connected Users", "Manage connected WhatsApp sessions"],
     autofeatures: ["Auto Features", "Control automated bot features"],
     commands: ["Commands", "Browse commands loaded from the Commands folder"],
     settings: ["Settings", "Configure your bot" ]
@@ -126,23 +125,81 @@ async function loadStatus() {
 }
 
 /* ==========================================
-   LOAD SESSIONS
+   ADMIN AUTHENTICATION
 ========================================== */
 
-async function loadSessions() {
-    try {
-        const data = await apiRequest("/api/sessions");
-        const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-        const container = document.getElementById("sessionsList");
+function getAdminToken() {
+    return sessionStorage.getItem("dripQueenAdminToken") || "";
+}
 
-        if (!container) return;
+function clearAdminToken() {
+    sessionStorage.removeItem("dripQueenAdminToken");
+}
+
+async function adminRequest(url, options = {}, timeoutMs = 10000) {
+    const token = getAdminToken();
+
+    if (!token) {
+        throw new Error("Admin login required");
+    }
+
+    return apiRequest(
+        url,
+        {
+            ...options,
+            headers: {
+                Authorization: `Bearer ${token}`,
+                ...(options.headers || {})
+            }
+        },
+        timeoutMs
+    );
+}
+
+async function adminLogin(name, password) {
+    const data = await apiRequest(
+        "/api/admin/login",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ name, password })
+        }
+    );
+
+    if (!data.token) {
+        throw new Error("Admin token was not returned");
+    }
+
+    sessionStorage.setItem("dripQueenAdminToken", data.token);
+    return data;
+}
+
+async function loadAdminSessions() {
+    const container = document.getElementById("adminSessionsList");
+    if (!container) return;
+
+    try {
+        const data = await adminRequest("/api/admin/sessions");
+        const sessions = Array.isArray(data.sessions)
+            ? data.sessions
+            : [];
+
+        updateElement("adminTotalUsers", sessions.length);
+        updateElement(
+            "adminOnlineUsers",
+            sessions.filter(session => session.connected).length
+        );
 
         container.innerHTML = "";
 
         if (!sessions.length) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <span>No active sessions</span>
+                    <span>📱</span>
+                    <h3>No connected or saved users</h3>
+                    <p>New users will appear here after pairing.</p>
                 </div>
             `;
             return;
@@ -159,57 +216,106 @@ async function loadSessions() {
                 ""
             );
 
+            const status = session.connected
+                ? "Connected"
+                : "Saved / Offline";
+
             item.innerHTML = `
                 <div class="session-info">
                     <strong>${escapeHTML(userId)}</strong>
-                    <span>${session.connected ? "Connected" : "Offline"}</span>
+                    <span class="${session.connected ? "session-online" : "session-offline"}">
+                        ${status}
+                    </span>
                 </div>
                 <button class="delete-session" type="button">
-                    Delete
+                    Remove
                 </button>
             `;
 
             item.querySelector("button").addEventListener(
                 "click",
-                () => deleteSession(userId)
+                () => adminDeleteSession(userId)
             );
 
             container.appendChild(item);
         }
     } catch (error) {
-        console.error("[SESSIONS ERROR]", error.message);
-        const container = document.getElementById("sessionsList");
-        if (container) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <span>Unable to load sessions</span>
-                </div>
-            `;
+        console.error("[ADMIN SESSIONS ERROR]", error.message);
+
+        if (error.message === "Admin authentication required") {
+            clearAdminToken();
+            showAdminLogin();
         }
+
+        container.innerHTML = `
+            <div class="empty-state">
+                <span>⚠️</span>
+                <h3>Unable to load connected devices</h3>
+                <p>${escapeHTML(error.message)}</p>
+            </div>
+        `;
     }
 }
 
-/* ==========================================
-   DELETE SESSION
-========================================== */
-
-async function deleteSession(userId) {
+async function adminDeleteSession(userId) {
     if (!userId) return;
 
-    if (!confirm(`Delete session ${userId}?`)) {
+    if (!confirm(
+        `Remove connected user ${userId}? This deletes the saved session credentials.`
+    )) {
         return;
     }
 
     try {
-        await apiRequest(
-            `/api/sessions/${encodeURIComponent(userId)}`,
+        await adminRequest(
+            `/api/admin/sessions/${encodeURIComponent(userId)}`,
             { method: "DELETE" }
         );
 
-        await loadSessions();
-        showToast("Session removed successfully", "success");
+        await loadAdminSessions();
+        await loadStatus();
+        showToast("Connected user removed", "success");
     } catch (error) {
+        if (error.message === "Admin authentication required") {
+            clearAdminToken();
+            showAdminLogin();
+        }
         showToast(error.message, "error");
+    }
+}
+
+function showAdminLogin() {
+    const loginCard = document.getElementById("adminLoginCard");
+    const panel = document.getElementById("adminPanel");
+
+    if (loginCard) loginCard.classList.remove("hidden");
+    if (panel) panel.classList.add("hidden");
+}
+
+function showAdminPanel() {
+    const loginCard = document.getElementById("adminLoginCard");
+    const panel = document.getElementById("adminPanel");
+
+    if (loginCard) loginCard.classList.add("hidden");
+    if (panel) panel.classList.remove("hidden");
+
+    loadAdminSessions().catch(() => {});
+}
+
+async function initializeAdmin() {
+    const token = getAdminToken();
+
+    if (!token) {
+        showAdminLogin();
+        return;
+    }
+
+    try {
+        await adminRequest("/api/admin/me");
+        showAdminPanel();
+    } catch {
+        clearAdminToken();
+        showAdminLogin();
     }
 }
 
@@ -278,7 +384,6 @@ async function generatePairingCode() {
         }
 
         showToast("Pairing code generated", "success");
-        await loadSessions();
     } catch (error) {
         if (result) result.textContent = `Error: ${error.message}`;
         if (pairCode) pairCode.textContent = "--------";
@@ -553,9 +658,9 @@ function initializeNavigation() {
 
             const sidebar = document.querySelector(".sidebar");
             if (sidebar) sidebar.classList.remove("show");
+            if (target === "admin") initializeAdmin();
             if (target === "commands") loadCommands();
-            if (target === "sessions") loadSessions();
-            if (target === "autofeatures") loadFeatures();
+                if (target === "autofeatures") loadFeatures();
             if (target === "settings") loadSettings();
         });
     }
@@ -581,6 +686,63 @@ function initializeMobileMenu() {
 }
 
 function initializeButtons() {
+    const adminLoginForm = document.getElementById("adminLoginForm");
+
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener("submit", async event => {
+            event.preventDefault();
+
+            const name = document.getElementById("adminName")?.value.trim();
+            const password = document.getElementById("adminPassword")?.value || "";
+            const errorBox = document.getElementById("adminLoginError");
+            const button = adminLoginForm.querySelector("button[type='submit']");
+
+            if (errorBox) {
+                errorBox.classList.add("hidden");
+                errorBox.textContent = "";
+            }
+
+            try {
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = "Authenticating...";
+                }
+
+                await adminLogin(name, password);
+                showAdminPanel();
+                showToast("Admin dashboard opened", "success");
+            } catch (error) {
+                if (errorBox) {
+                    errorBox.textContent = error.message;
+                    errorBox.classList.remove("hidden");
+                }
+                showToast(error.message, "error");
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = "🔐 Open Admin Dashboard";
+                }
+            }
+        });
+    }
+
+    const adminRefreshButton = document.getElementById("adminRefreshBtn");
+    if (adminRefreshButton) {
+        adminRefreshButton.addEventListener("click", () => {
+            loadAdminSessions();
+            loadStatus();
+        });
+    }
+
+    const adminLogoutButton = document.getElementById("adminLogoutBtn");
+    if (adminLogoutButton) {
+        adminLogoutButton.addEventListener("click", () => {
+            clearAdminToken();
+            showAdminLogin();
+            showToast("Admin logged out", "success");
+        });
+    }
+
     const pairingForm = document.getElementById("pairingForm");
 
     if (pairingForm) {
@@ -593,11 +755,6 @@ function initializeButtons() {
     const refreshButton = document.getElementById("refreshBtn");
     if (refreshButton) {
         refreshButton.addEventListener("click", refreshDashboard);
-    }
-
-    const refreshSessionsButton = document.getElementById("refreshSessionsBtn");
-    if (refreshSessionsButton) {
-        refreshSessionsButton.addEventListener("click", loadSessions);
     }
 
     const copyPairButton = document.getElementById("copyPairCode");
@@ -629,7 +786,6 @@ function initializeButtons() {
 async function refreshDashboard(showMessage = false) {
     const results = await Promise.allSettled([
         loadStatus(),
-        loadSessions(),
         loadCommands(),
         loadFeatures(),
         loadSettings()
@@ -670,7 +826,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setInterval(() => {
         loadStatus().catch(() => {});
-        loadSessions().catch(() => {});
     }, 10000);
 });
 

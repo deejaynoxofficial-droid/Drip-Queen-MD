@@ -116,19 +116,7 @@
                     <span class="nav-icon">🔑</span>
 
                     <span>
-                        Generate Pairing Code
-                    </span>
-                </button>
-
-
-                <button
-                    class="nav-item"
-                    data-page="sessions"
-                >
-                    <span class="nav-icon">📱</span>
-
-                    <span>
-                        Connected Users
+                        Connect WhatsApp
                     </span>
                 </button>
 
@@ -156,6 +144,16 @@
                     </span>
                 </button>
 
+
+                <button
+                    class="nav-item"
+                    data-page="admin"
+                >
+                    <span class="nav-icon">🛡️</span>
+                    <span>
+                        Admin Control
+                    </span>
+                </button>
 
                 <button
                     class="nav-item"
@@ -453,26 +451,6 @@
 
                         <button
                             class="quick-action"
-                            data-go="sessions"
-                        >
-
-                            <span>
-                                📱
-                            </span>
-
-                            <strong>
-                                Sessions
-                            </strong>
-
-                            <small>
-                                Manage Connected Users
-                            </small>
-
-                        </button>
-
-
-                        <button
-                            class="quick-action"
                             data-go="autofeatures"
                         >
 
@@ -591,7 +569,7 @@
                                 </span>
 
                                 <strong>
-                                    50 Users
+                                    Multi-user • No fixed limit
                                 </strong>
 
                             </div>
@@ -720,66 +698,6 @@
                             id="pairingError"
                             class="error-box hidden"
                         ></div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
-
-            <!-- ============================= -->
-            <!-- SESSIONS PAGE -->
-            <!-- ============================= -->
-
-            <section
-                id="sessions"
-                class="page"
-            >
-
-                <div class="section-card">
-
-                    <div class="section-header">
-
-                        <div>
-
-                            <h2>
-                                Connected WhatsApp Users
-                            </h2>
-
-                            <p>
-                                Manage all active bot sessions.
-                            </p>
-
-                        </div>
-
-
-                        <button
-                            id="refreshSessionsBtn"
-                            class="secondary-btn"
-                        >
-                            ↻ Refresh
-                        </button>
-
-                    </div>
-
-
-                    <div
-                        id="sessionsList"
-                        class="sessions-list"
-                    >
-
-                        <div class="empty-state">
-
-                            <span>
-                                📱
-                            </span>
-
-                            <h3>
-                                Loading Sessions...
-                            </h3>
-
-                        </div>
 
                     </div>
 
@@ -1211,6 +1129,91 @@
 
             </section>
 
+
+            <!-- ============================= -->
+            <!-- ADMIN PAGE -->
+            <!-- ============================= -->
+
+            <section
+                id="admin"
+                class="page"
+            >
+                <div class="section-card admin-login-card" id="adminLoginCard">
+                    <div class="section-header">
+                        <div>
+                            <h2>🛡️ Creator Admin Control</h2>
+                            <p>Only the creator can view and manage all connected WhatsApp users.</p>
+                        </div>
+                    </div>
+
+                    <form id="adminLoginForm" class="admin-login-form">
+                        <label>
+                            <span>Developer Name</span>
+                            <input
+                                id="adminName"
+                                type="text"
+                                autocomplete="username"
+                                placeholder="Enter developer name"
+                                required
+                            >
+                        </label>
+
+                        <label>
+                            <span>Password</span>
+                            <input
+                                id="adminPassword"
+                                type="password"
+                                autocomplete="current-password"
+                                placeholder="Enter admin password"
+                                required
+                            >
+                        </label>
+
+                        <button class="primary-btn" type="submit">
+                            🔐 Open Admin Dashboard
+                        </button>
+
+                        <div id="adminLoginError" class="error-box hidden"></div>
+                    </form>
+                </div>
+
+                <div class="admin-panel hidden" id="adminPanel">
+                    <div class="section-card">
+                        <div class="section-header">
+                            <div>
+                                <h2>Connected Devices</h2>
+                                <p>Creator-only management of every connected bot session.</p>
+                            </div>
+                            <div class="admin-toolbar">
+                                <span class="admin-badge">ADMIN</span>
+                                <button id="adminRefreshBtn" class="secondary-btn" type="button">↻ Refresh</button>
+                                <button id="adminLogoutBtn" class="secondary-btn" type="button">Log out</button>
+                            </div>
+                        </div>
+
+                        <div class="admin-stats">
+                            <div class="admin-stat">
+                                <span>Total connected/saved</span>
+                                <strong id="adminTotalUsers">0</strong>
+                            </div>
+                            <div class="admin-stat">
+                                <span>Online now</span>
+                                <strong id="adminOnlineUsers">0</strong>
+                            </div>
+                            <div class="admin-stat">
+                                <span>Capacity</span>
+                                <strong>Multi-user</strong>
+                            </div>
+                        </div>
+
+                        <div id="adminSessionsList" class="sessions-list">
+                            <div class="empty-state">
+                                <span>Sign in to load connected devices.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <!-- ============================= -->
             <!-- SETTINGS PAGE -->
