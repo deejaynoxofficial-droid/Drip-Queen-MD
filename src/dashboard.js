@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 
@@ -148,6 +149,102 @@ const DEFAULT_FEATURES = {
 };
 
 
+
+/* ==========================================
+   ADMIN DASHBOARD AUTHENTICATION
+   Stateless signed token so it also works on
+   serverless dashboard deployments.
+========================================== */
+
+const ADMIN_TOKEN_TTL = 8 * 60 * 60 * 1000;
+
+function adminSecret() {
+    return crypto
+        .createHash("sha256")
+        .update(
+            `${config.ADMIN_NAME}:${config.ADMIN_PASSWORD}:drip-queen-admin`
+        )
+        .digest();
+}
+
+function createAdminToken() {
+    const payload = Buffer.from(
+        JSON.stringify({
+            role: "admin",
+            name: config.ADMIN_NAME,
+            exp: Date.now() + ADMIN_TOKEN_TTL
+        })
+    ).toString("base64url");
+
+    const signature = crypto
+        .createHmac("sha256", adminSecret())
+        .update(payload)
+        .digest("base64url");
+
+    return `${payload}.${signature}`;
+}
+
+function verifyAdminToken(token) {
+    if (!token || typeof token !== "string") return false;
+
+    const parts = token.split(".");
+    if (parts.length !== 2) return false;
+
+    const [payload, signature] = parts;
+
+    try {
+        const expected = crypto
+            .createHmac("sha256", adminSecret())
+            .update(payload)
+            .digest("base64url");
+
+        const a = Buffer.from(signature);
+        const b = Buffer.from(expected);
+
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+            return false;
+        }
+
+        const data = JSON.parse(
+            Buffer.from(payload, "base64url").toString("utf8")
+        );
+
+        return (
+            data.role === "admin" &&
+            data.name === config.ADMIN_NAME &&
+            Number(data.exp) > Date.now()
+        );
+    } catch {
+        return false;
+    }
+}
+
+function getAdminToken(req) {
+    const auth = String(
+        req.headers.authorization || ""
+    );
+
+    if (/^Bearer\s+/i.test(auth)) {
+        return auth.replace(/^Bearer\s+/i, "").trim();
+    }
+
+    return String(
+        req.headers["x-admin-token"] || ""
+    ).trim();
+}
+
+function requireAdmin(req, res, next) {
+    if (!verifyAdminToken(getAdminToken(req))) {
+        return res.status(401).json({
+            success: false,
+            error: "Admin authentication required"
+        });
+    }
+
+    req.isAdmin = true;
+    next();
+}
+
 /* ==========================================
    CREATE DASHBOARD
 ========================================== */
@@ -229,6 +326,153 @@ function createDashboard(app) {
         }
     );
 
+
+    /* ======================================
+       ADMIN LOGIN
+    ====================================== */
+
+    app.post(
+        "/api/admin/login",
+        (req, res) => {
+            const name = String(req.body?.name || "").trim();
+            const password = String(req.body?.password || "");
+
+            const validName = name === config.ADMIN_NAME;
+            const validPassword = password === config.ADMIN_PASSWORD;
+
+            if (!validName || !validPassword) {
+                return res.status(401).json({
+                    success: false,
+                    error: "Invalid admin credentials"
+                });
+            }
+
+            res.json({
+                success: true,
+                token: createAdminToken(),
+                admin: {
+                    name: config.ADMIN_NAME,
+                    expiresIn: ADMIN_TOKEN_TTL
+                }
+            });
+        }
+    );
+
+    app.get(
+        "/api/admin/me",
+        requireAdmin,
+        (req, res) => {
+            res.json({
+                success: true,
+                admin: {
+                    name: config.ADMIN_NAME,
+                    expiresIn: ADMIN_TOKEN_TTL
+                }
+            });
+        }
+    );
+
+    /* ======================================
+       ADMIN SESSION MANAGEMENT
+       Only the creator/admin can access these.
+    ====================================== */
+
+    app.get(
+        "/api/admin/sessions",
+        requireAdmin,
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    const workerSessions = await workerRequest(
+                        "/api/admin/sessions",
+                        {
+                            headers: {
+                                Authorization:
+                                    `Bearer ${getAdminToken(req)}`
+                            }
+                        }
+                    );
+                    return res.json(workerSessions);
+                }
+
+                const sessions = await getSessions();
+
+                res.json({
+                    success: true,
+                    total: sessions.length,
+                    multiUser: true,
+                    sessionLimit: null,
+                    sessions
+                });
+            } catch (error) {
+                console.error(
+                    "[ADMIN SESSIONS ERROR]",
+                    error.message
+                );
+
+                res.status(500).json({
+                    success: false,
+                    error: "Failed to load connected users"
+                });
+            }
+        }
+    );
+
+    app.delete(
+        "/api/admin/sessions/:userId",
+        requireAdmin,
+        async (req, res) => {
+            try {
+                const userId = sanitizeUserId(req.params.userId);
+
+                if (!userId) {
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid session ID"
+                    });
+                }
+
+                if (BOT_WORKER_URL) {
+                    const result = await workerRequest(
+                        `/api/admin/sessions/${encodeURIComponent(userId)}`,
+                        {
+                            method: "DELETE",
+                            headers: {
+                                Authorization:
+                                    `Bearer ${getAdminToken(req)}`
+                            }
+                        }
+                    );
+                    return res.json(result);
+                }
+
+                const removed = await deleteSession(userId);
+
+                if (!removed) {
+                    return res.status(404).json({
+                        success: false,
+                        error: "Connected user not found"
+                    });
+                }
+
+                res.json({
+                    success: true,
+                    message: "Connected user removed successfully"
+                });
+            } catch (error) {
+                console.error(
+                    "[ADMIN REMOVE SESSION ERROR]",
+                    error.message
+                );
+
+                res.status(500).json({
+                    success: false,
+                    error: error.message ||
+                        "Failed to remove connected user"
+                });
+            }
+        }
+    );
 
     /* ======================================
        API STATUS
@@ -321,6 +565,7 @@ function createDashboard(app) {
 
     app.get(
         "/api/sessions",
+        requireAdmin,
         async (req, res) => {
 
             try {
@@ -374,6 +619,7 @@ function createDashboard(app) {
 
     app.delete(
         "/api/sessions/:userId",
+        requireAdmin,
         async (req, res) => {
 
             try {
