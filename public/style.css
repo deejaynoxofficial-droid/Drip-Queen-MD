@@ -1496,6 +1496,35 @@ button {
 }
 
 
+
+
+/* Clear WhatsApp pairing-code display */
+.pairing-result .pairing-instruction-main {
+    margin-top: 18px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pairing-result .pairing-instruction-steps {
+    margin-top: 8px;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+}
+
+.pair-code {
+    display: block;
+    min-height: 34px;
+    padding: 16px 20px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: .22em;
+    text-align: center;
+    user-select: text;
+    cursor: text;
+}
+
 /* ==========================================
    ERROR BOX
 ========================================== */
