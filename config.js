@@ -72,6 +72,20 @@ const config = {
 
 
     /* ==========================================
+       ADMIN DASHBOARD AUTHENTICATION
+       Prefer setting these in .env in production.
+    ========================================== */
+
+    ADMIN_NAME:
+        process.env.ADMIN_NAME ||
+        "NOX STAR TECH",
+
+    ADMIN_PASSWORD:
+        process.env.ADMIN_PASSWORD ||
+        "Dripqueenmd",
+
+
+    /* ==========================================
        OWNER SETTINGS
     ========================================== */
 
