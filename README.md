@@ -1,88 +1,557 @@
-# DRIP QUEEN MD — FINAL INTEGRATED BUILD
+<div align="center">
 
-## Deployment architecture
-Use Render for the persistent Baileys worker. Vercel is optional for the public dashboard/API proxy.
+<img src="./assets/logo.png" alt="DRIP QUEEN MD Logo" width="220"/>
 
-### Render environment
-Do **not** set `BOT_WORKER_URL` on Render.
+# 👑 DRIP QUEEN MD
 
-```env
-BOT_NAME=DRIP QUEEN MD
-BOT_VERSION=1.0.0
-PREFIX=.
-OWNER_NUMBER=256XXXXXXXXX
-MULTI_USER=true
-PAIRING_CODE_ONLY=true
-HOST=0.0.0.0
+### ⚡ A Powerful Multi-Device WhatsApp Bot
+
+<p>
+  <img src="https://img.shields.io/badge/WhatsApp-Bot-25D366?style=for-the-badge&logo=whatsapp&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Node.js-Backend-339933?style=for-the-badge&logo=node.js&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Baileys-Multi--Device-8b5cf6?style=for-the-badge"/>
+</p>
+
+<p>
+  <img src="https://img.shields.io/github/stars/YOUR_USERNAME/DRIP-QUEEN-MD?style=for-the-badge&logo=github"/>
+  <img src="https://img.shields.io/github/forks/YOUR_USERNAME/DRIP-QUEEN-MD?style=for-the-badge&logo=github"/>
+  <img src="https://img.shields.io/github/license/YOUR_USERNAME/DRIP-QUEEN-MD?style=for-the-badge"/>
+</p>
+
+<p>
+  <b>Fast • Powerful • Modern • Multi-Session</b>
+</p>
+
+<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=700&size=22&pause=1000&color=8B5CF6&center=true&vCenter=true&width=700&lines=Welcome+to+DRIP+QUEEN+MD+%F0%9F%91%91;Your+Ultimate+WhatsApp+Companion+%F0%9F%92%9C;Multi-Device+%E2%9A%A1+Multi-Session+%F0%9F%91%A5;Fast+%E2%80%A2+Stable+%E2%80%A2+Powerful+%F0%9F%9A%80" alt="Typing Animation"/>
+
+<br>
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=8B5CF6&height=120&section=header" width="100%"/>
+
+</div>
+
+---
+
+# 👋 About DRIP QUEEN MD
+
+**DRIP QUEEN MD** is a modern **WhatsApp Multi-Device bot** built with **Node.js** and **Baileys**.
+
+It is designed to provide a fast, powerful and customizable WhatsApp automation experience with support for:
+
+* 📱 Multi-Device WhatsApp
+* 🔗 Pairing Code Connection
+* 👥 Multiple Sessions
+* ⚡ Fast Commands
+* 🎛️ Web Dashboard
+* 🤖 Automatic Features
+* 🔄 Automatic Reconnection
+* 📂 Dynamic Command Loading
+* ⚙️ Persistent Settings
+* 🗄️ Session Management
+
+> 👑 **DRIP QUEEN MD — More than a bot. It's a WhatsApp automation system.**
+
+---
+
+# ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 📱 WhatsApp
+
+* 🔗 Pairing Code
+* 📱 Multi-Device Support
+* 👥 Multi-Session
+* 🟢 Always Online
+* 🔄 Auto Reconnect
+
+</td>
+
+<td width="50%">
+
+### ⚡ Automation
+
+* 🤖 Auto Read
+* ⌨️ Auto Typing
+* 🎙️ Auto Recording
+* ❤️ Auto React
+* ⚡ Fast Responses
+
+</td>
+</tr>
+
+<tr>
+<td width="50%">
+
+### 🎛️ Dashboard
+
+* 🏠 Modern Dashboard
+* 🔐 Pairing Management
+* 👥 Session Management
+* ⚙️ Feature Settings
+* 📊 Bot Statistics
+
+</td>
+
+<td width="50%">
+
+### 🧩 Developer
+
+* 📂 Dynamic Commands
+* 🗄️ Persistent Database
+* ⚙️ Config System
+* 🛡️ Error Handling
+* 🚀 Easy Deployment
+
+</td>
+</tr>
+</table>
+
+---
+
+# 🖥️ Dashboard
+
+<div align="center">
+
+### 🎛️ Modern • Responsive • Powerful
+
+<!-- Replace this image with your actual dashboard screenshot -->
+
+<img src="./assets/dashboard.png" alt="DRIP QUEEN MD Dashboard" width="900"/>
+
+</div>
+
+The dashboard provides a centralized interface for managing your bot.
+
+### Dashboard sections
+
+| Section     | Description                 |
+| ----------- | --------------------------- |
+| 🏠 Home     | Bot overview and statistics |
+| 🔐 Pairing  | Connect WhatsApp accounts   |
+| 👥 Sessions | Manage active sessions      |
+| ⚡ Features  | Control automatic features  |
+| 🧩 Commands | Browse available commands   |
+| ⚙️ Settings | Manage bot configuration    |
+
+---
+
+# 📁 Project Structure
+
+```text
+DRIP-QUEEN-MD/
+│
+├── Commands/
+│   ├── alive.js
+│   ├── menu.js
+│   ├── search.js
+│   └── ...
+│
+├── assets/
+│   ├── logo.png
+│   └── dashboard.png
+│
+├── dashboard/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+│
+├── sessions/
+│   └── .gitkeep
+│
+├── commandLoader.js
+├── config.js
+├── dashboard.js
+├── database.js
+├── functions.js
+├── index.js
+├── menuSession.js
+├── newSession.js
+├── session.js
+├── sessionManager.js
+├── settings.json
+├── package.json
+├── .gitignore
+└── README.md
 ```
 
-Start command:
+---
+
+# 🛠️ Requirements
+
+Before installing DRIP QUEEN MD, make sure you have:
+
+* 🟢 Node.js 20+
+* 📦 npm
+* 📱 A WhatsApp account
+* 🌐 Internet connection
+
+Check Node.js:
+
+```bash
+node --version
+```
+
+Check npm:
+
+```bash
+npm --version
+```
+
+---
+
+# 🚀 Installation
+
+### 1️⃣ Clone the repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/DRIP-QUEEN-MD.git
+```
+
+### 2️⃣ Enter the project
+
+```bash
+cd DRIP-QUEEN-MD
+```
+
+### 3️⃣ Install dependencies
+
+```bash
+npm install
+```
+
+### 4️⃣ Start the bot
+
 ```bash
 npm start
 ```
 
-### Vercel environment
-If the dashboard is deployed through Vercel, set:
-```env
-BOT_WORKER_URL=https://YOUR-RENDER-SERVICE.onrender.com
-```
-Then redeploy Vercel.
+Or:
 
-## Pairing
-1. Dashboard → Connect WhatsApp.
-2. Enter the number with country code, digits only.
-3. Click Generate Pair Code.
-4. Enter the 8-character code in WhatsApp → Linked Devices → Link with phone number.
-5. Credentials are saved in `sessions/<number>/` and restored after restart.
-
-## APIs
-- `GET /api/status`
-- `GET /api/sessions`
-- `DELETE /api/sessions/:userId`
-- `POST /api/pair`
-- `GET /api/commands`
-- `GET /api/features`
-- `POST /api/features/:featureName`
-- `GET /api/settings`
-- `POST /api/settings`
-
-## Dashboard
-The dashboard includes live status, pairing, sessions, commands, auto-features, settings, API error handling, a non-blocking loading screen, and `bot.png` branding.
-
-## Security
-Never commit `.env` or real WhatsApp session credentials. Keep `sessions/` private.
-
-## Vercel ↔ Render backend connection
-
-The dashboard is designed as a frontend/API layer on Vercel while the Baileys WhatsApp worker runs persistently on Render.
-
-### Vercel environment variable
-
-Set this in the Vercel project:
-
-```env
-BOT_WORKER_URL=https://drip-queen-md.onrender.com
+```bash
+node index.js
 ```
 
-The current build also contains a **Vercel-only fallback** to that Render URL. This means pairing and dashboard API requests can still reach Render if the Vercel variable was accidentally omitted. The fallback is never enabled on Render, preventing the worker from proxying to itself.
+---
 
-### Render environment
+# ☁️ Recommended Hosting Architecture
 
-Do **not** set `BOT_WORKER_URL` or `RENDER_WORKER_URL` on Render. Render should run the bot locally with `npm start`.
+DRIP QUEEN MD uses a persistent WhatsApp connection and local session files. For reliable multi-session operation, run the **bot worker** on a persistent Node.js host such as Render, Railway, or a VPS.
 
-### Proxied dashboard APIs
+Vercel should be used as the **dashboard/API proxy** only.
 
-When deployed to Vercel, these requests are forwarded to the Render worker:
+### Persistent worker
 
-- `GET /api/status`
-- `GET /api/sessions`
-- `DELETE /api/sessions/:userId`
-- `POST /api/pair`
-- `GET /api/commands`
-- `GET /api/features`
-- `POST /api/features/:featureName`
-- `GET /api/settings`
-- `POST /api/settings`
-- `GET /api/backend-status`
+```text
+npm install
+npm start
+```
 
-If Render is unreachable, the dashboard now reports a backend/worker connection error instead of attempting to create a WhatsApp session inside Vercel.
+Required worker environment:
+
+```env
+PORT=3000
+HOST=0.0.0.0
+```
+
+### Vercel dashboard
+
+Set this environment variable in the Vercel project:
+
+```env
+BOT_WORKER_URL=https://YOUR-WORKER-DOMAIN
+```
+
+The Vercel dashboard then proxies status, sessions, pairing, commands, features, and settings requests to the persistent worker.
+
+> Do not rely on Vercel's temporary filesystem for WhatsApp session storage.
+
+---
+
+# 🔐 Pairing Your WhatsApp
+
+When the bot starts, open the dashboard.
+
+Navigate to:
+
+```text
+Dashboard
+      ↓
+Pairing
+      ↓
+Enter WhatsApp Number
+      ↓
+Generate Pairing Code
+      ↓
+WhatsApp
+      ↓
+Linked Devices
+      ↓
+Link a Device
+      ↓
+Enter Pairing Code
+```
+
+🎉 Your WhatsApp account should now be connected.
+
+---
+
+# 📱 WhatsApp Commands
+
+Commands are organized inside the:
+
+```text
+Commands/
+```
+
+directory.
+
+Example:
+
+| Command   | Description           |
+| --------- | --------------------- |
+| `.menu`   | Show bot menu         |
+| `.alive`  | Check bot status      |
+| `.search` | Search the web        |
+| `.ping`   | Check response speed  |
+| `.owner`  | Show bot owner        |
+| `.help`   | Show help information |
+
+> 🚧 More commands are being added continuously.
+
+---
+
+# ⚙️ Configuration
+
+Bot settings can be customized through:
+
+```text
+config.js
+```
+
+Example:
+
+```javascript
+const config = {
+    BOT_NAME: "DRIP QUEEN MD",
+    BOT_VERSION: "1.0.0",
+    CREATOR: "NOX STAR TECH"
+};
+```
+
+You can also manage persistent feature settings through:
+
+```text
+settings.json
+```
+
+---
+
+# 🧩 Dynamic Command System
+
+DRIP QUEEN MD uses a dynamic command loader.
+
+Instead of modifying the main `index.js` every time you create a command, simply add a new file inside:
+
+```text
+Commands/
+```
+
+Example:
+
+```text
+Commands/
+├── alive.js
+├── menu.js
+├── search.js
+├── ping.js
+└── owner.js
+```
+
+The command loader automatically discovers available commands.
+
+### Example command
+
+```javascript
+module.exports = {
+    name: "alive",
+    description: "Check bot status",
+    category: "General",
+
+    async execute(sock, msg) {
+        await sock.sendMessage(
+            msg.key.remoteJid,
+            {
+                text: "👑 DRIP QUEEN MD IS ALIVE!"
+            },
+            {
+                quoted: msg
+            }
+        );
+    }
+};
+```
+
+---
+
+# 🤖 Automatic Features
+
+DRIP QUEEN MD supports configurable automatic features.
+
+```text
+🤖 Auto Read
+⌨️ Auto Typing
+🎙️ Auto Recording
+❤️ Auto React
+🟢 Always Online
+🔄 Auto Reconnect
+```
+
+These features can be controlled through the dashboard.
+
+---
+
+# 👥 Multi-Session System
+
+DRIP QUEEN MD is designed to support multiple WhatsApp sessions.
+
+Each session can have its own:
+
+* 🔐 Authentication state
+* ⚙️ Settings
+* 📱 WhatsApp connection
+* 🗄️ Session data
+
+Sessions are stored inside:
+
+```text
+sessions/
+```
+
+This allows multiple WhatsApp accounts to use the system without mixing authentication data.
+
+---
+
+# 🛡️ Stability
+
+DRIP QUEEN MD is designed with stability in mind.
+
+The system includes:
+
+* 🔄 Automatic reconnection
+* 🛡️ Command error handling
+* 📂 Dynamic command loading
+* 🗄️ Persistent settings
+* 👥 Session isolation
+* ⚡ Lightweight architecture
+
+---
+
+# 📦 Deployment
+
+DRIP QUEEN MD can be deployed on platforms that support Node.js.
+
+### 💻 Termux
+
+```bash
+pkg update
+pkg upgrade
+
+pkg install nodejs git
+
+git clone https://github.com/deejaynoxofficial-droid/Drip-Queen-MD.git
+
+cd DRIP-QUEEN-MD
+
+npm install
+
+npm start
+```
+
+### ☁️ Render
+
+A deployment configuration can be provided through:
+
+```text
+render.yaml
+```
+
+Set the required environment variables and deploy the Node.js service.
+
+---
+
+# 🧑‍💻 Developer
+
+<div align="center">
+
+<img src="./assets/logo.png" width="120"/>
+
+### 👑 NOX STAR TECH
+
+**Creator & Developer of DRIP QUEEN MD**
+
+</div>
+
+---
+
+# 💜 Support
+
+If you like **DRIP QUEEN MD**, consider supporting the project.
+
+<div align="center">
+
+⭐ Star the repository
+
+🍴 Fork the project
+
+🐛 Report bugs
+
+💡 Suggest features
+
+🤝 Contribute improvements
+
+</div>
+
+---
+
+# ⚠️ Disclaimer
+
+DRIP QUEEN MD is an independent WhatsApp automation project.
+
+This project is **not affiliated with, endorsed by, or sponsored by WhatsApp or Meta Platforms, Inc.**
+
+Use the bot responsibly and follow WhatsApp's terms and applicable laws.
+
+---
+
+# 📜 License
+
+This project is licensed under the **MIT License**.
+
+See:
+
+```text
+LICENSE
+```
+
+for more information.
+
+---
+
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=8B5CF6&height=120&section=footer" width="100%"/>
+
+### 👑 DRIP QUEEN MD
+
+**Made with 💜 by NOX STAR TECH**
+
+<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=600&size=16&pause=1200&color=A78BFA&center=true&vCenter=true&width=600&lines=Fast+%E2%9A%A1+Powerful+%F0%9F%94%A5+Modern+%F0%9F%92%9C;Multi-Device+%F0%9F%93%B1+Multi-Session+%F0%9F%91%A5;DRIP+QUEEN+MD+%F0%9F%91%91" alt="Footer Animation"/>
+
+<br>
+
+**© 2026 NOX STAR TECH**
+
+</div>
