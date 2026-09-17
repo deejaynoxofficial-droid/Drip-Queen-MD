@@ -618,7 +618,7 @@ function initializeButtons() {
     }
 
     document.querySelectorAll("[data-action='refresh']").forEach(button => {
-        button.addEventListener("click", refreshDashboard);
+        button.addEventListener("click", () => refreshDashboard(true));
     });
 
     document.querySelectorAll("[data-action='save-settings']").forEach(button => {
@@ -626,8 +626,8 @@ function initializeButtons() {
     });
 }
 
-async function refreshDashboard() {
-    await Promise.allSettled([
+async function refreshDashboard(showMessage = false) {
+    const results = await Promise.allSettled([
         loadStatus(),
         loadSessions(),
         loadCommands(),
@@ -635,7 +635,15 @@ async function refreshDashboard() {
         loadSettings()
     ]);
 
-    showToast("Dashboard refreshed", "success");
+    const failed = results.filter(result => result.status === "rejected");
+    if (failed.length) console.warn(`[DASHBOARD] ${failed.length} API request(s) failed`);
+
+    if (showMessage) {
+        showToast(
+            failed.length ? "Dashboard refreshed with API warnings" : "Dashboard refreshed",
+            failed.length ? "error" : "success"
+        );
+    }
 }
 
 /* ==========================================
