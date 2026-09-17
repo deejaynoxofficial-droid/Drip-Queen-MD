@@ -138,47 +138,6 @@ The dashboard provides a centralized interface for managing your bot.
 
 ---
 
-# 📁 Project Structure
-
-```text
-DRIP-QUEEN-MD/
-│
-├── Commands/
-│   ├── alive.js
-│   ├── menu.js
-│   ├── search.js
-│   └── ...
-│
-├── assets/
-│   ├── logo.png
-│   └── dashboard.png
-│
-├── dashboard/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-│
-├── sessions/
-│   └── .gitkeep
-│
-├── commandLoader.js
-├── config.js
-├── dashboard.js
-├── database.js
-├── functions.js
-├── index.js
-├── menuSession.js
-├── newSession.js
-├── session.js
-├── sessionManager.js
-├── settings.json
-├── package.json
-├── .gitignore
-└── README.md
-```
-
----
-
 # 🛠️ Requirements
 
 Before installing DRIP QUEEN MD, make sure you have:
@@ -207,7 +166,7 @@ npm --version
 ### 1️⃣ Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/DRIP-QUEEN-MD.git
+git clone https://github.com/deejaynoxofficial-droid/Drip-Queen-MD
 ```
 
 ### 2️⃣ Enter the project
@@ -323,30 +282,6 @@ Example:
 
 ---
 
-# ⚙️ Configuration
-
-Bot settings can be customized through:
-
-```text
-config.js
-```
-
-Example:
-
-```javascript
-const config = {
-    BOT_NAME: "DRIP QUEEN MD",
-    BOT_VERSION: "1.0.0",
-    CREATOR: "NOX STAR TECH"
-};
-```
-
-You can also manage persistent feature settings through:
-
-```text
-settings.json
-```
-
 ---
 
 # 🧩 Dynamic Command System
@@ -371,30 +306,6 @@ Commands/
 ```
 
 The command loader automatically discovers available commands.
-
-### Example command
-
-```javascript
-module.exports = {
-    name: "alive",
-    description: "Check bot status",
-    category: "General",
-
-    async execute(sock, msg) {
-        await sock.sendMessage(
-            msg.key.remoteJid,
-            {
-                text: "👑 DRIP QUEEN MD IS ALIVE!"
-            },
-            {
-                quoted: msg
-            }
-        );
-    }
-};
-```
-
----
 
 # 🤖 Automatic Features
 
