@@ -1054,16 +1054,15 @@ async function generatePairingCode(
     }
 
 
+    // Pairing MUST use the dedicated new-session generator.
+    // Do not fall back to createSession/connectSession here because
+    // those functions intentionally require an existing creds.json.
+    // Calling connectSession for a new number produces:
+    // "No saved credentials found for <number>".
     const possibleFunctions = [
-
+        "generatePairingCode",
         "createNewSession",
-
-        "startNewSession",
-
-        "createSession",
-
-        "generatePairingCode"
-
+        "startNewSession"
     ];
 
 
