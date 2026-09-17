@@ -1755,17 +1755,36 @@ async function generatePairingCode(phoneNumber) {
         }
     });
 
-    // Give the socket a moment to initialize before requesting the code.
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Baileys may need a short moment to initialize on slower hosts.
+    // Retry a few times instead of returning a false pairing failure.
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+            await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 1200 : 1000));
+            const code = await sock.requestPairingCode(userId);
+            const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
+
+            if (!cleanCode) {
+                throw new Error("WhatsApp returned an empty pairing code.");
+            }
+
+            console.log(`[PAIRING] Code generated for ${userId}`);
+            return { number: userId, code: cleanCode };
+        } catch (error) {
+            lastError = error;
+            console.warn(`[PAIRING] Attempt ${attempt}/5 failed for ${userId}: ${error.message}`);
+        }
+    }
+
+    activeSessions.delete(userId);
+    connectingSessions.delete(userId);
 
     try {
-        const code = await sock.requestPairingCode(userId);
-        return { number: userId, code };
-    } catch (error) {
-        activeSessions.delete(userId);
-        connectingSessions.delete(userId);
-        throw error;
-    }
+        sock.ws?.close();
+    } catch {}
+
+    throw lastError || new Error("Unable to generate WhatsApp pairing code.");
 }
 
 /* ==========================================

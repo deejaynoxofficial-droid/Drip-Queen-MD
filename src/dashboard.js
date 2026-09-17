@@ -10,7 +10,27 @@ const config = require("../config");
    persistent Render/Railway/VPS worker. Leave this unset
    on the worker itself so requests are handled locally.
 */
-const BOT_WORKER_URL = String(process.env.BOT_WORKER_URL || "")
+const VERCEL_RUNTIME =
+    process.env.VERCEL === "1" ||
+    process.env.VERCEL === "true";
+
+/*
+   Vercel is the dashboard/API layer while Render is the persistent
+   WhatsApp worker.  BOT_WORKER_URL is preferred, but we keep a safe
+   Vercel-only fallback so the dashboard still reaches the worker when
+   the Vercel environment variable was not added yet.
+
+   IMPORTANT: this fallback is enabled ONLY on Vercel.  The Render worker
+   must never proxy to itself.
+*/
+const DEFAULT_VERCEL_WORKER_URL =
+    "https://drip-queen-md.onrender.com";
+
+const BOT_WORKER_URL = String(
+    process.env.BOT_WORKER_URL ||
+    process.env.RENDER_WORKER_URL ||
+    (VERCEL_RUNTIME ? DEFAULT_VERCEL_WORKER_URL : "")
+)
     .trim()
     .replace(/\/+$/, "");
 
@@ -222,7 +242,11 @@ function createDashboard(app) {
 
                 if (BOT_WORKER_URL) {
                     const workerStatus = await workerRequest("/api/status");
-                    return res.json(workerStatus);
+                    return res.json({
+                        ...workerStatus,
+                        backendConnected: true,
+                        backend: "render"
+                    });
                 }
 
                 const sessions =
@@ -267,12 +291,21 @@ function createDashboard(app) {
 
             } catch (error) {
 
-                res.status(500).json({
+                console.error(
+                    "[STATUS API ERROR]",
+                    error.message
+                );
+
+                res.status(BOT_WORKER_URL ? 502 : 500).json({
 
                     success: false,
 
+                    backendConnected: false,
+
                     error:
-                        "Failed to load server status"
+                        BOT_WORKER_URL
+                            ? `Render backend unreachable: ${error.message}`
+                            : "Failed to load server status"
 
                 });
 
@@ -911,6 +944,53 @@ function createDashboard(app) {
 
             }
 
+        }
+    );
+
+
+    /* ======================================
+       BACKEND CONNECTION STATUS
+    ====================================== */
+
+    app.get(
+        "/api/backend-status",
+        async (req, res) => {
+
+            if (!BOT_WORKER_URL) {
+                return res.json({
+                    success: true,
+                    connected: true,
+                    backend: "local",
+                    message: "Dashboard is running against the local bot worker"
+                });
+            }
+
+            try {
+                const workerStatus = await workerRequest("/api/status");
+
+                return res.json({
+                    success: true,
+                    connected: true,
+                    backend: "render",
+                    workerUrl: BOT_WORKER_URL,
+                    status: workerStatus.status || "online",
+                    sessions: workerStatus.sessions ?? 0,
+                    commands: workerStatus.commands ?? 0,
+                    timestamp: Date.now()
+                });
+            } catch (error) {
+                console.error(
+                    "[BACKEND STATUS ERROR]",
+                    error.message
+                );
+
+                return res.status(502).json({
+                    success: false,
+                    connected: false,
+                    backend: "render",
+                    error: `Render backend unreachable: ${error.message}`
+                });
+            }
         }
     );
 
@@ -1681,12 +1761,14 @@ function readSettingsFile() {
 
 
     const defaultSettings = {
-
-        features:
-            {
-                ...DEFAULT_FEATURES
-            }
-
+        botName: config.BOT_NAME,
+        prefix: config.PREFIX,
+        creator: config.CREATOR,
+        mode: config.MODE,
+        version: config.BOT_VERSION,
+        features: {
+            ...DEFAULT_FEATURES
+        }
     };
 
 
@@ -1736,17 +1818,16 @@ function readSettingsFile() {
 
 
         return {
-
+            botName: parsed.botName || config.BOT_NAME,
+            prefix: parsed.prefix || config.PREFIX,
+            creator: parsed.creator || config.CREATOR,
+            mode: parsed.mode || config.MODE,
+            version: parsed.version || config.BOT_VERSION,
             ...parsed,
-
             features: {
-
                 ...DEFAULT_FEATURES,
-
                 ...(parsed.features || {})
-
             }
-
         };
 
     } catch (error) {
@@ -1849,3 +1930,11 @@ module.exports.getFeatureSettings =
 
 module.exports.DEFAULT_FEATURES =
     DEFAULT_FEATURES;
+
+module.exports.getBackendConfig = function () {
+    return {
+        remote: Boolean(BOT_WORKER_URL),
+        vercel: VERCEL_RUNTIME,
+        workerUrl: BOT_WORKER_URL || null
+    };
+};
