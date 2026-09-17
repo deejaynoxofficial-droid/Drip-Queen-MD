@@ -24,14 +24,9 @@ const config = require(
 
 const {
     generatePairingCode,
-
     getSessions,
-
-    disconnectSession
-
-} = require(
-    "./lib/Whatsapp"
-);
+    removeSession: disconnectSession
+} = require("./src/newSession");
 
 
 /* ==========================================
@@ -385,10 +380,12 @@ app.post(
         try {
 
             let {
-
-                number
-
+                number,
+                phoneNumber
             } = req.body;
+
+            // Accept both field names so the dashboard and API stay compatible.
+            number = number || phoneNumber;
 
 
             /* ==============================
@@ -460,6 +457,9 @@ app.post(
                     result.number,
 
                 code:
+                    result.code,
+
+                pairingCode:
                     result.code
 
             });
