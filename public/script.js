@@ -327,6 +327,7 @@ async function generatePairingCode() {
     const input = document.getElementById("phoneNumber");
     const result = document.getElementById("pairingResult");
     const pairCode = document.getElementById("pairCode");
+    const pairingStatus = document.getElementById("pairingStatus");
 
     if (!input) return;
 
@@ -351,10 +352,11 @@ async function generatePairingCode() {
             errorBox.classList.add("hidden");
             errorBox.textContent = "";
         }
-        if (result) result.textContent = "Generating pairing code...";
+        if (result) result.classList.remove("hidden");
+        if (pairingStatus) pairingStatus.textContent = "Generating pairing code...";
         if (pairCode) {
-            pairCode.textContent = "--------";
-            pairCode.style.display = "";
+            pairCode.value = "";
+            pairCode.placeholder = "Generating pairing code...";
         }
 
         const data = await apiRequest(
@@ -375,18 +377,24 @@ async function generatePairingCode() {
             throw new Error("Server did not return a pairing code");
         }
 
-        if (pairCode) pairCode.textContent = formatPairingCode(code);
+        if (pairCode) {
+            pairCode.value = formatPairingCode(code);
+            pairCode.placeholder = "";
+        }
         const resultBox = document.getElementById("pairingResult");
         if (resultBox) resultBox.classList.remove("hidden");
-        if (result) {
-            result.textContent =
+        if (pairingStatus) {
+            pairingStatus.textContent =
                 "Open WhatsApp → Linked devices → Link a device → Link with phone number";
         }
 
         showToast("Pairing code generated", "success");
     } catch (error) {
-        if (result) result.textContent = `Error: ${error.message}`;
-        if (pairCode) pairCode.textContent = "--------";
+        if (pairingStatus) pairingStatus.textContent = `Error: ${error.message}`;
+        if (pairCode) {
+            pairCode.value = "";
+            pairCode.placeholder = "No pairing code generated";
+        }
         const errorBox = document.getElementById("pairingError");
         if (errorBox) {
             errorBox.textContent = error.message;
@@ -760,7 +768,7 @@ function initializeButtons() {
     const copyPairButton = document.getElementById("copyPairCode");
     if (copyPairButton) {
         copyPairButton.addEventListener("click", async () => {
-            const code = document.getElementById("pairCode")?.textContent?.trim();
+            const code = document.getElementById("pairCode")?.value?.trim();
             if (!code || /^[-\s]+$/.test(code)) {
                 showToast("Generate a pairing code first", "error");
                 return;

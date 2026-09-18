@@ -657,12 +657,19 @@
                                     Enter This Code in WhatsApp
                                 </h3>
 
-                                <div
+                                <label class="pair-code-label" for="pairCode">
+                                    Generated pairing code
+                                </label>
+
+                                <input
                                     id="pairCode"
                                     class="pair-code"
+                                    type="text"
+                                    value=""
+                                    placeholder="Your code will appear here"
+                                    readonly
+                                    aria-describedby="pairingStatus"
                                 >
-                                    ---- ----
-                                </div>
 
                                 <button
                                     type="button"
@@ -672,7 +679,7 @@
                                     📋 Copy Code
                                 </button>
 
-                                <p class="pairing-instruction-main">
+                                <p id="pairingStatus" class="pairing-instruction-main" aria-live="polite">
                                     Enter this exact code in WhatsApp.
                                 </p>
 
