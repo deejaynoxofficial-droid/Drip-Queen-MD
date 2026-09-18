@@ -2404,3 +2404,56 @@ button {
         width: 100%;
     }
 }
+
+
+/* ==========================================
+   3D SCIENCE ANIMATED BOND BACKGROUND
+========================================== */
+
+.science-bond-background {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: -1;
+    perspective: 900px;
+    opacity: .45;
+}
+
+.science-bond-background span {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff, #06b6d4 35%, #7c3aed 75%);
+    box-shadow: 0 0 25px rgba(6,182,212,.7);
+    animation: moleculeFloat 12s infinite ease-in-out;
+}
+
+.science-bond-background span::after {
+    content: "";
+    position: absolute;
+    width: 150px;
+    height: 2px;
+    left: 10px;
+    top: 8px;
+    transform-origin: left center;
+    background: linear-gradient(90deg, rgba(6,182,212,.8), transparent);
+    animation: bondPulse 3s infinite;
+}
+
+.science-bond-background span:nth-child(1){left:12%;top:20%;animation-delay:0s}
+.science-bond-background span:nth-child(2){left:70%;top:15%;animation-delay:2s}
+.science-bond-background span:nth-child(3){left:45%;top:70%;animation-delay:4s}
+.science-bond-background span:nth-child(4){left:80%;top:65%;animation-delay:1s}
+.science-bond-background span:nth-child(5){left:25%;top:80%;animation-delay:3s}
+
+@keyframes moleculeFloat {
+    0%,100% { transform: translateZ(0) translateY(0) rotateY(0deg); }
+    50% { transform: translateZ(160px) translateY(-45px) rotateY(180deg); }
+}
+
+@keyframes bondPulse {
+    0%,100% { opacity:.25; transform:scaleX(.5); }
+    50% { opacity:1; transform:scaleX(1); }
+}
