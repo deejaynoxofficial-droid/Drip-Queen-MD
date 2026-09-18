@@ -301,7 +301,7 @@
                             class="primary-btn"
                             data-go="pairing"
                         >
-                            🔑 Whatsapp Pairing Code
+                            🔑 Connect WhatsApp
                         </button>
 
                     </div>
@@ -443,7 +443,7 @@
                             </span>
 
                             <strong>
-                                Whatsapp Pairing Code
+                                Connect WhatsApp
                             </strong>
 
                             <small>
@@ -554,7 +554,7 @@
                             <div class="server-info-item">
 
                                 <span class="info-label">
-                                    👥 Active Users
+                                    👥 Active Sessions
                                 </span>
 
                                 <strong
@@ -573,7 +573,7 @@
                                 </span>
 
                                 <strong>
-                                    Multi-user
+                                    Multi-user • No fixed limit
                                 </strong>
 
                             </div>
@@ -634,12 +634,52 @@
 
                                 </div>
 
-                                
-
                                 <small>
                                     Include country code.
                                     Example: 256700000000
                                 </small>
+
+                            </div>
+
+
+                            <!-- PAIRING RESULT MOVED BELOW PHONE FIELD -->
+
+                            <div
+                                id="pairingResult"
+                                class="pairing-result hidden"
+                            >
+
+                                <div class="result-icon">
+                                    🔐
+                                </div>
+
+                                <h3>
+                                    Enter This Code in WhatsApp
+                                </h3>
+
+                                <div
+                                    id="pairCode"
+                                    class="pair-code"
+                                >
+                                    ---- ----
+                                </div>
+
+                                <button
+                                    type="button"
+                                    id="copyPairCode"
+                                    class="copy-btn"
+                                >
+                                    📋 Copy Code
+                                </button>
+
+                                <p class="pairing-instruction-main">
+                                    Enter this exact code in WhatsApp.
+                                </p>
+
+                                <p class="pairing-instruction-steps">
+                                    WhatsApp → Linked Devices → Link a Device →
+                                    Link with phone number.
+                                </p>
 
                             </div>
 
@@ -659,47 +699,6 @@
                             </button>
 
                         </form>
-
-
-                        <!-- PAIRING RESULT -->
-
-                        <div
-                            id="pairingResult"
-                            class="pairing-result hidden"
-                        >
-
-                            <div class="result-icon">
-                                🔐
-                            </div>
-
-                            <h3>
-                                Enter This Code in WhatsApp
-                            </h3>
-
-                            <div
-                                id="pairCode"
-                                class="pair-code"
-                            >
-                                ---- ----
-                            </div>
-
-                            <button
-                                id="copyPairCode"
-                                class="copy-btn"
-                            >
-                                📋 Copy Code
-                            </button>
-
-                            <p class="pairing-instruction-main">
-                                Enter this exact code in WhatsApp.
-                            </p>
-
-                            <p class="pairing-instruction-steps">
-                                WhatsApp → Linked Devices → Link a Device →
-                                Link with phone number.
-                            </p>
-
-                        </div>
 
 
                         <!-- PAIRING ERROR -->
