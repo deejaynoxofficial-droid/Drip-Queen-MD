@@ -45,6 +45,28 @@ const config = {
         "Nox Star",
 
 
+    CREATORS:
+
+        process.env.CREATORS ||
+        "NOX STAR.B & NOX STAR TECH",
+
+
+    BOT_CHANNEL:
+
+        process.env.BOT_CHANNEL ||
+        "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y",
+
+
+    /* ==========================================
+       WELCOME IMAGE
+    ========================================== */
+
+    BOT_IMAGE_PATH:
+
+        process.env.BOT_IMAGE_PATH ||
+        path.join(ROOT_DIR, "public", "bot.png"),
+
+
     PREFIX:
 
         process.env.PREFIX ||
