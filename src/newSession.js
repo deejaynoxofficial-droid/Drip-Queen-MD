@@ -207,20 +207,20 @@ async function sendWelcomeMessage(userId, sock) {
                 ? configuredImage
                 : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━╮
-┃ ✨ Welcome, ${user}
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
+┃ ✨ Welcome, @user
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
 ┃ 🔹 Prefix: ${prefix}
 ┃
-┃ 💎 Type ${prefix}menu to explore!
+┃ 💎 Type ${prefix}menu to explore
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ > 👑 NOX STAR BOTS
-┃ > 🛠️ NOX STAR TECH
-╰━━━━━━━━━━━━━━╯`;
+┃ 👑 NOX STAR.B
+┃ 🛠️ NOX STAR TECH
+╰━━━━━━━━━━━━━━━━━╯`;
 
         const messageContent = {
             caption,
@@ -1078,7 +1078,7 @@ async function handleCommand(
         if (!command) {
 
             console.log(
-                `[COMMAND] Unknown: ${commandName}`
+                `[COMMAND] Unknown: ${commandName} | available=${commandLoader?.getCommandCount?.() || 0}`
             );
 
             return;
@@ -1130,6 +1130,10 @@ async function handleCommand(
             // Full compatibility context for all bundled commands.
             // Some commands expect `message` while others use `msg`.
             message: msg,
+            m: msg,
+            chatId: msg.key?.remoteJid,
+            jid: msg.key?.remoteJid,
+            pushName: msg.pushName || "User",
 
             // React helper used by alive, antilink, and other commands.
             react:
@@ -1145,6 +1149,15 @@ async function handleCommand(
                         }
                     );
 
+                },
+
+            sendMessage:
+                async (content, options = {}) => {
+                    return await sock.sendMessage(
+                        msg.key.remoteJid,
+                        content,
+                        { quoted: msg, ...options }
+                    );
                 },
 
             reply:
@@ -1171,6 +1184,8 @@ async function handleCommand(
 
         };
 
+
+        console.log(`[COMMAND] Running ${command.name || commandName} (${command.file || "unknown file"})`);
 
         if (
             typeof command.execute ===
@@ -1217,9 +1232,17 @@ async function handleCommand(
     } catch (error) {
 
         console.error(
-            "[COMMAND HANDLER ERROR]",
-            error.message
+            `[COMMAND HANDLER ERROR] ${commandName}:`,
+            error.stack || error.message
         );
+
+        try {
+            await sock.sendMessage(
+                msg.key.remoteJid,
+                { text: `❌ Command *${commandName}* failed.\n${error.message}` },
+                { quoted: msg }
+            );
+        } catch {}
 
     }
 
