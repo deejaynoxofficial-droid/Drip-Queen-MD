@@ -28,6 +28,7 @@ let fetchLatestBaileysVersion;
 let fetchLatestWaWebVersion;
 let makeCacheableSignalKeyStore;
 let Browsers;
+let jidNormalizedUser;
 
 async function loadBaileys() {
     if (!baileysModule) {
@@ -169,114 +170,102 @@ function getWelcomeMarkerPath(userId) {
 
 async function sendWelcomeMessage(userId, sock) {
 
+    const WELCOME_VERSION = "welcome-v2";
+
     try {
 
         if (!sock?.user?.id) {
+            console.warn(`[WELCOME] No bot JID available for ${userId}`);
             return false;
         }
 
-        const markerPath =
-            getWelcomeMarkerPath(userId);
+        const markerPath = getWelcomeMarkerPath(userId);
+        let marker = null;
 
-        if (fs.existsSync(markerPath)) {
+        try {
+            if (fs.existsSync(markerPath)) {
+                marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
+            }
+        } catch {}
+
+        // Do not resend the same welcome forever, but allow this redesigned
+        // welcome card to appear once for existing sessions.
+        if (marker?.version === WELCOME_VERSION) {
             return false;
         }
 
-        const creatorNames =
-            config.CREATORS ||
-            "NOX STAR.B & NOX STAR TECH";
+        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
+        const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
+        const prefix = config.PREFIX || ".";
 
-        const channel =
-            config.BOT_CHANNEL ||
-            "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
+        const imagePath = path.isAbsolute(configuredImage)
+            ? configuredImage
+            : path.join(config.ROOT_DIR, configuredImage);
 
-        const prefix =
-            config.PREFIX || ".";
-
-        /*
-         * The welcome card is sent with a real image instead of a
-         * plain-text-only message.  Replace public/bot.png to change
-         * the artwork without touching the JavaScript.
-         */
-        const configuredImage =
-            config.BOT_IMAGE_PATH ||
-            path.join(config.PUBLIC_PATH, "bot.png");
-
-        const imagePath =
-            path.isAbsolute(configuredImage)
-                ? configuredImage
-                : path.join(config.ROOT_DIR, configuredImage);
-
-        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━╮
-┃ ✨ Welcome, ${user}
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
+┃ ✨ Welcome, @user
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
 ┃ 🔹 Prefix: ${prefix}
 ┃
-┃ 💎 Type ${prefix}menu to explore!
+┃ 💎 Type ${prefix}menu to explore
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ > 👑 NOX STAR BOT
-┃ > 🛠️ NOX STAR TECH
-╰━━━━━━━━━━━━━━╯`;
+┃ 👑 NOX STAR.B
+┃ 🛠️ NOX STAR TECH
+╰━━━━━━━━━━━━━━━━━╯`;
 
-        const messageContent = {
-            caption,
-            mimetype: "image/png"
-        };
+        let target = sock.user.id;
+        try {
+            if (typeof jidNormalizedUser === "function") {
+                target = jidNormalizedUser(sock.user.id);
+            }
+        } catch {}
+
+        let sent = false;
+
+        // Wait briefly after connection open so the paired account is ready
+        // to accept an outbound message.
+        await new Promise(resolve => setTimeout(resolve, 1200));
 
         if (fs.existsSync(imagePath)) {
-
-            messageContent.image =
-                fs.readFileSync(imagePath);
-
-            await sock.sendMessage(
-                sock.user.id,
-                messageContent
-            );
-
-            console.log(
-                `[WELCOME] Image welcome card sent to ${userId}`
-            );
-
+            try {
+                await sock.sendMessage(target, {
+                    image: fs.readFileSync(imagePath),
+                    caption
+                });
+                sent = true;
+                console.log(`[WELCOME] Image welcome card sent to ${userId}`);
+            } catch (imageError) {
+                console.warn(`[WELCOME] Image send failed for ${userId}: ${imageError.message}`);
+            }
         } else {
-
-            // Safe fallback if the custom welcome image is missing.
-            await sock.sendMessage(
-                sock.user.id,
-                { text: caption }
-            );
-
-            console.warn(
-                `[WELCOME] Image not found at ${imagePath}; sent text fallback.`
-            );
+            console.warn(`[WELCOME] Image not found at ${imagePath}`);
         }
 
-        fs.mkdirSync(
-            path.dirname(markerPath),
-            { recursive: true }
-        );
+        // Always have a working fallback if image delivery fails.
+        if (!sent) {
+            await sock.sendMessage(target, { text: caption });
+            sent = true;
+            console.log(`[WELCOME] Text welcome sent to ${userId}`);
+        }
 
-        fs.writeFileSync(
-            markerPath,
-            JSON.stringify({
+        if (sent) {
+            fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+            fs.writeFileSync(markerPath, JSON.stringify({
                 sentAt: new Date().toISOString(),
-                version: config.BOT_VERSION || "1.0.0"
-            }),
-            "utf8"
-        );
+                version: WELCOME_VERSION,
+                botVersion: config.BOT_VERSION || "1.0.0"
+            }, null, 2), "utf8");
+        }
 
-        return true;
+        return sent;
 
     } catch (error) {
-
-        console.error(
-            `[WELCOME ERROR] ${userId}:`,
-            error.message
-        );
-
+        console.error(`[WELCOME ERROR] ${userId}:`, error.stack || error.message);
         return false;
     }
 }
@@ -910,6 +899,8 @@ async function handleMessages(
             const text =
                 getMessageText(msg);
 
+            console.log(`[MESSAGE EVENT] ${userId} type=${messageUpdate?.type || "unknown"} jid=${remoteJid} fromMe=${Boolean(msg.key?.fromMe)}`);
+
 
             console.log(
                 `[MESSAGE] ${userId}: ${text || "[MEDIA MESSAGE]"}`
@@ -959,44 +950,53 @@ async function handleMessages(
 
 function getMessageText(msg) {
 
-    const message = msg?.message;
+    try {
+        let message = msg?.message;
+        if (!message) return "";
 
-    if (!message) return "";
+        // Unwrap nested WhatsApp message containers.
+        const unwrapKeys = [
+            "ephemeralMessage",
+            "viewOnceMessage",
+            "viewOnceMessageV2",
+            "viewOnceMessageV2Extension",
+            "documentWithCaptionMessage",
+            "editedMessage"
+        ];
 
-    // Unwrap common WhatsApp containers.
-    const unwrapped =
-        message.ephemeralMessage?.message ||
-        message.viewOnceMessage?.message ||
-        message.viewOnceMessageV2?.message ||
-        message.documentWithCaptionMessage?.message ||
-        message;
+        let changed = true;
+        while (message && changed) {
+            changed = false;
+            for (const key of unwrapKeys) {
+                if (message?.[key]?.message) {
+                    message = message[key].message;
+                    changed = true;
+                    break;
+                }
+            }
+        }
 
-    if (typeof unwrapped.conversation === "string") {
-        return unwrapped.conversation.trim();
-    }
+        const candidates = [
+            message?.conversation,
+            message?.extendedTextMessage?.text,
+            message?.imageMessage?.caption,
+            message?.videoMessage?.caption,
+            message?.documentMessage?.caption,
+            message?.buttonsResponseMessage?.selectedButtonId,
+            message?.listResponseMessage?.singleSelectReply?.selectedRowId,
+            message?.templateButtonReplyMessage?.selectedId,
+            message?.templateButtonReplyMessage?.selectedDisplayText,
+            message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson
+        ];
 
-    if (typeof unwrapped.extendedTextMessage?.text === "string") {
-        return unwrapped.extendedTextMessage.text.trim();
-    }
+        for (const value of candidates) {
+            if (typeof value === "string" && value.trim()) {
+                return value.trim();
+            }
+        }
 
-    if (typeof unwrapped.imageMessage?.caption === "string") {
-        return unwrapped.imageMessage.caption.trim();
-    }
-
-    if (typeof unwrapped.videoMessage?.caption === "string") {
-        return unwrapped.videoMessage.caption.trim();
-    }
-
-    if (typeof unwrapped.documentMessage?.caption === "string") {
-        return unwrapped.documentMessage.caption.trim();
-    }
-
-    if (typeof unwrapped.buttonsResponseMessage?.selectedButtonId === "string") {
-        return unwrapped.buttonsResponseMessage.selectedButtonId.trim();
-    }
-
-    if (typeof unwrapped.listResponseMessage?.singleSelectReply?.selectedRowId === "string") {
-        return unwrapped.listResponseMessage.singleSelectReply.selectedRowId.trim();
+    } catch (error) {
+        console.error("[TEXT EXTRACTION ERROR]", error.message);
     }
 
     return "";
@@ -1014,238 +1014,118 @@ async function handleCommand(
     text
 ) {
 
+    let commandName = "unknown";
+
     try {
+        const prefix = String(config.PREFIX || ".");
+        const normalizedText = String(text || "")
+            .replace(/[\u200B-\u200D\uFEFF]/g, "")
+            .trim();
 
-        const prefix =
-            config.PREFIX || ".";
-
-
-        if (
-            !text.startsWith(prefix)
-        ) {
-
-            return;
-
+        if (!normalizedText || !normalizedText.startsWith(prefix)) {
+            return false;
         }
 
+        const body = normalizedText.slice(prefix.length).trim();
+        if (!body) return false;
 
-        const body =
-            text
-                .slice(prefix.length)
-                .trim();
+        const parts = body.split(/\s+/);
+        commandName = String(parts.shift() || "").toLowerCase();
+        const args = parts;
+        if (!commandName) return false;
 
-
-        if (!body) {
-
-            return;
-
+        if (!commandLoader) {
+            throw new Error("Command loader is unavailable");
         }
 
-
-        const args =
-            body.split(/\s+/);
-
-
-        const commandName =
-            args
-                .shift()
-                ?.toLowerCase();
-
-
-        if (!commandName) {
-
-            return;
-
-        }
-
-
-        // Ensure the command registry is populated before lookup.
-        if (
-            commandLoader &&
-            typeof commandLoader.isLoaded === "function" &&
-            !commandLoader.isLoaded() &&
-            typeof commandLoader.loadCommands === "function"
-        ) {
+        // Load once if startup did not populate the registry.
+        if (!commandLoader.isLoaded?.()) {
             await commandLoader.loadCommands();
         }
 
-        const command =
-            await findCommand(
-                commandName
-            );
-
-
+        const command = await findCommand(commandName);
         if (!command) {
-
-            console.log(
-                `[COMMAND] Unknown: ${commandName} | available=${commandLoader?.getCommandCount?.() || 0}`
-            );
-
-            return;
-
+            console.log(`[COMMAND] Unknown: ${commandName} | loaded=${commandLoader.getCommandCount?.() || 0}`);
+            return false;
         }
 
+        const chatId = msg?.key?.remoteJid;
+        if (!chatId) return false;
 
-        console.log(
-            `[COMMAND] Executing: ${commandName}`
-        );
-
+        console.log(`[COMMAND] Executing ${prefix}${commandName} for ${userId}`);
 
         const context = {
-
             sock,
-
+            client: sock,
             msg,
-
-            args,
-
-            text,
-
-            commandName,
-
-            prefix,
-
-            sender:
-
-                msg.key?.participant ||
-
-                msg.key?.remoteJid,
-
-
-            from:
-                msg.key?.remoteJid,
-
-
-            isGroup:
-
-                msg.key?.remoteJid
-                    ?.endsWith(
-                        "@g.us"
-                    ) || false,
-
-
-            userId,
-
-
-            // Full compatibility context for all bundled commands.
-            // Some commands expect `message` while others use `msg`.
             message: msg,
             m: msg,
-            chatId: msg.key?.remoteJid,
-            jid: msg.key?.remoteJid,
+            args,
+            text: normalizedText,
+            body,
+            commandName,
+            command: command.name,
+            prefix,
+            sender: msg.key?.participant || chatId,
+            from: chatId,
+            chatId,
+            jid: chatId,
+            userId,
             pushName: msg.pushName || "User",
+            isGroup: chatId.endsWith("@g.us"),
+            isFromMe: Boolean(msg.key?.fromMe),
 
-            // React helper used by alive, antilink, and other commands.
-            react:
-                async emoji => {
+            reply: async (message, options = {}) => {
+                const content = typeof message === "string"
+                    ? { text: message }
+                    : message;
+                return sock.sendMessage(chatId, content, { quoted: msg, ...options });
+            },
 
-                    return await sock.sendMessage(
-                        msg.key.remoteJid,
-                        {
-                            react: {
-                                text: String(emoji),
-                                key: msg.key
-                            }
-                        }
-                    );
+            sendMessage: async (content, options = {}) => {
+                return sock.sendMessage(chatId, content, { quoted: msg, ...options });
+            },
 
-                },
+            react: async emoji => {
+                return sock.sendMessage(chatId, {
+                    react: { text: String(emoji), key: msg.key }
+                });
+            },
 
-            sendMessage:
-                async (content, options = {}) => {
-                    return await sock.sendMessage(
-                        msg.key.remoteJid,
-                        content,
-                        { quoted: msg, ...options }
-                    );
-                },
-
-            reply:
-
-                async message => {
-
-                    return await sock.sendMessage(
-
-                        msg.key.remoteJid,
-
-                        {
-                            text:
-                                String(message)
-                        },
-
-                        {
-                            quoted:
-                                msg
-                        }
-
-                    );
-
-                }
-
+            sendText: async message => {
+                return sock.sendMessage(chatId, { text: String(message) }, { quoted: msg });
+            }
         };
 
+        let executor = null;
+        if (typeof command.execute === "function") executor = command.execute;
+        else if (typeof command.run === "function") executor = command.run;
+        else if (typeof command.handler === "function") executor = command.handler;
 
-        console.log(`[COMMAND] Running ${command.name || commandName} (${command.file || "unknown file"})`);
-
-        if (
-            typeof command.execute ===
-            "function"
-        ) {
-
-            await command.execute(
-                context
-            );
-
+        if (!executor) {
+            throw new Error(`Command "${command.name}" has no execution function`);
         }
 
-        else if (
-            typeof command.run ===
-            "function"
-        ) {
-
-            await command.run(
-                context
-            );
-
-        }
-
-        else if (
-            typeof command.handler ===
-            "function"
-        ) {
-
-            await command.handler(
-                context
-            );
-
-        }
-
-        else {
-
-            console.log(
-                `[COMMAND ERROR] ${commandName} has no execution function`
-            );
-
-        }
-
+        await executor(context);
+        console.log(`[COMMAND] Completed ${prefix}${commandName}`);
+        return true;
 
     } catch (error) {
-
-        console.error(
-            `[COMMAND HANDLER ERROR] ${commandName}:`,
-            error.stack || error.message
-        );
+        console.error(`[COMMAND ERROR] ${commandName}:`, error.stack || error.message);
 
         try {
-            await sock.sendMessage(
-                msg.key.remoteJid,
-                { text: `❌ Command *${commandName}* failed.\n${error.message}` },
-                { quoted: msg }
-            );
-        } catch {}
+            const chatId = msg?.key?.remoteJid;
+            if (chatId) {
+                await sock.sendMessage(chatId, {
+                    text: `❌ ${config.BOT_NAME || "DRIP QUEEN MD"}\nCommand: ${config.PREFIX || "."}${commandName}\nError: ${error.message}`
+                }, { quoted: msg });
+            }
+        } catch (replyError) {
+            console.error("[COMMAND ERROR REPLY FAILED]", replyError.message);
+        }
 
+        return false;
     }
-
 }
 
 
