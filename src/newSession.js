@@ -207,54 +207,20 @@ async function sendWelcomeMessage(userId, sock) {
                 ? configuredImage
                 : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `
-╭━━━━━━━━━━━━━━━━━━━━━━╮
-┃   👑 *DRIP QUEEN MD* 👑
-┃      *WHATSAPP BOT*
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-
-╭─〔 ✨ CONNECTION SUCCESSFUL 〕─╮
-│
-│  🎉 *WELCOME, YOUR BOT IS READY!*
-│
-│  Your WhatsApp account has been
-│  successfully paired and connected.
-│
-╰──────────────────────────────╯
-
-╭─〔 🤖 BOT INFORMATION 〕─╮
-│
-│  ▸ *Bot:* DRIP QUEEN MD
-│  ▸ *Creators:* ${creatorNames}
-│  ▸ *Prefix:* ${prefix}
-│  ▸ *Mode:* ${String(config.MODE || "public").toUpperCase()}
-│
-╰──────────────────────────╯
-
-╭─〔 🚀 QUICK START 〕─╮
-│
-│  📋 Type *${prefix}menu* to open the
-│     full command menu.
-│
-│  ⚡ Fast • Powerful • Multi-Device
-│  🔐 Secure session • Public mode
-│
-╰──────────────────────╯
-
-╭─〔 📢 OFFICIAL CHANNEL 〕─╮
-│
-│  🔗 *Follow DRIP QUEEN MD*
-│  ${channel}
-│
-│  🔔 Get updates, new features,
-│     commands & announcements.
-│
-╰────────────────────────────╯
-
-╭━━━━━━━━━━━━━━━━━━━━━━╮
-┃  ⭐ *POWERED BY NOX STAR TECH* ⭐
-┃  💚 *Stay Connected • We Are Family*
-╰━━━━━━━━━━━━━━━━━━━━━━╯`;
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
+┃ ✨ Welcome, @user
+┃
+┃ 🤖 Bot   : DRIP QUEEN MD
+┃ ⚡ Mode  : Public
+┃ 🔹 Prefix: ${prefix}
+┃
+┃ 💎 Type ${prefix}menu to explore
+┃ 📢 Channel:
+┃ ${channel}
+┃
+┃ 👑 NOX STAR.B
+┃ 🛠️ NOX STAR TECH
+╰━━━━━━━━━━━━━━━━━╯`;
 
         const messageContent = {
             caption,
