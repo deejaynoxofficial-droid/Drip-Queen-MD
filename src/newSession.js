@@ -26,6 +26,7 @@ let useMultiFileAuthState;
 let DisconnectReason;
 let fetchLatestBaileysVersion;
 let makeCacheableSignalKeyStore;
+let Browsers;
 
 async function loadBaileys() {
     if (!baileysModule) {
@@ -44,6 +45,42 @@ async function loadBaileys() {
 const pino = require("pino");
 
 const config = require("../config");
+
+/*
+   WhatsApp's web-version helper in older Baileys builds can lag behind
+   the version currently accepted by WhatsApp.  That can produce a valid
+   looking pairing code which WhatsApp rejects when the user enters it.
+
+   The official Baileys repository updated its Web version to this value
+   on 2026-07-26. Keep it overridable with WA_WEB_VERSION so it can be
+   updated without changing the source when WhatsApp changes again.
+*/
+const DEFAULT_WA_WEB_VERSION = [2, 3000, 1043857760];
+
+function getWhatsAppWebVersion() {
+    const raw = String(process.env.WA_WEB_VERSION || "").trim();
+
+    if (raw) {
+        const parsed = raw
+            .split(/[.,\s-]+/)
+            .map(Number);
+
+        if (parsed.length === 3 && parsed.every(Number.isInteger)) {
+            return parsed;
+        }
+    }
+
+    return DEFAULT_WA_WEB_VERSION;
+}
+
+function getPairingBrowser() {
+    if (Browsers?.macOS) {
+        return Browsers.macOS("Safari");
+    }
+
+    // Defensive fallback for an unexpected Baileys export shape.
+    return ["Safari", "Mac OS", "1.0.0"];
+}
 
 
 /* ==========================================
@@ -352,9 +389,7 @@ async function connectSession(userId) {
         );
 
 
-        const {
-            version
-        } = await fetchLatestBaileysVersion();
+        const version = getWhatsAppWebVersion();
 
 
         const {
@@ -401,16 +436,11 @@ async function connectSession(userId) {
                         level: "silent"
                     }),
 
-                browser: [
-
-                    config.BOT_NAME ||
-                    "DRIP QUEEN MD",
-
-                    "Chrome",
-
-                    "1.0.0"
-
-                ],
+                // Use a canonical Baileys browser tuple. Do not put the bot
+                // name in browser[0]; WhatsApp's pairing-code flow validates
+                // this display string more strictly than normal login.
+                browser:
+                    getPairingBrowser(),
 
                 printQRInTerminal:
                     false,
@@ -1712,7 +1742,7 @@ async function generatePairingCode(phoneNumber) {
         throw new Error("This number already has saved WhatsApp credentials.");
     }
 
-    const { version } = await fetchLatestBaileysVersion();
+    const version = getWhatsAppWebVersion();
 
     const sock = makeWASocket({
         version,
@@ -1724,7 +1754,9 @@ async function generatePairingCode(phoneNumber) {
             )
         },
         logger: pino({ level: "silent" }),
-        browser: [config.BOT_NAME || "DRIP QUEEN MD", "Chrome", "1.0.0"],
+        // Canonical browser tuple prevents WhatsApp from issuing a
+        // pairing code that is rejected when entered on the phone.
+        browser: getPairingBrowser(),
         printQRInTerminal: false,
         markOnlineOnConnect: true,
         syncFullHistory: false,
@@ -1736,10 +1768,43 @@ async function generatePairingCode(phoneNumber) {
     attachSessionHandlers(userId, sock);
 
     sock.ev.on("connection.update", update => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, isNewLogin } = update;
+
+        // Baileys emits isNewLogin after WhatsApp accepts the pairing.
+        // The protocol then expects the socket to restart using the newly
+        // saved credentials. Without this, the phone can appear linked but
+        // the bot never reaches the normal authenticated connection state.
+        if (isNewLogin) {
+            console.log(`[PAIRING] ${userId} accepted by WhatsApp; restarting session...`);
+
+            if (!reconnectTimers.has(userId)) {
+                const timer = setTimeout(async () => {
+                    reconnectTimers.delete(userId);
+
+                    const current = activeSessions.get(userId);
+                    if (current === sock) {
+                        activeSessions.delete(userId);
+                    }
+
+                    try {
+                        sock.ws?.close();
+                    } catch {}
+
+                    try {
+                        await connectSession(userId);
+                    } catch (error) {
+                        console.error(`[PAIRING RESTART ERROR] ${userId}:`, error.message);
+                    }
+                }, 1500);
+
+                reconnectTimers.set(userId, timer);
+            }
+        }
 
         if (connection === "open") {
             connectingSessions.delete(userId);
+            clearReconnectTimer(userId);
+            activeSessions.set(userId, sock);
             console.log(`[PAIRING] ${userId} connected successfully`);
             return;
         }
@@ -1749,8 +1814,17 @@ async function generatePairingCode(phoneNumber) {
             connectingSessions.delete(userId);
 
             const statusCode = lastDisconnect?.error?.output?.statusCode;
+            console.log(`[PAIRING] ${userId} socket closed (${statusCode || "unknown"})`);
+
             if (statusCode === DisconnectReason.loggedOut) {
                 clearReconnectTimer(userId);
+                return;
+            }
+
+            // If WhatsApp requires a restart after pairing, isNewLogin above
+            // already scheduled it. Do not create a second timer here.
+            if (reconnectTimers.has(userId)) {
+                return;
             }
         }
     });
@@ -1762,6 +1836,12 @@ async function generatePairingCode(phoneNumber) {
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
             await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 1200 : 1000));
+
+            // Never ask a socket that has already closed for another code.
+            if (sock.ws && (sock.ws.isClosed || sock.ws.isClosing || sock.ws.isOpen === false)) {
+                throw new Error("WhatsApp connection closed before the pairing code was requested.");
+            }
+
             const code = await sock.requestPairingCode(userId);
             const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
 
@@ -1769,11 +1849,15 @@ async function generatePairingCode(phoneNumber) {
                 throw new Error("WhatsApp returned an empty pairing code.");
             }
 
-            console.log(`[PAIRING] Code generated for ${userId}`);
+            console.log(`[PAIRING] Code generated for ${userId}: ${cleanCode}`);
             return { number: userId, code: cleanCode };
         } catch (error) {
             lastError = error;
             console.warn(`[PAIRING] Attempt ${attempt}/5 failed for ${userId}: ${error.message}`);
+
+            if (sock.ws?.isClosed || sock.ws?.isClosing) {
+                break;
+            }
         }
     }
 
