@@ -1059,6 +1059,16 @@ async function handleCommand(
         }
 
 
+        // Ensure the command registry is populated before lookup.
+        if (
+            commandLoader &&
+            typeof commandLoader.isLoaded === "function" &&
+            !commandLoader.isLoaded() &&
+            typeof commandLoader.loadCommands === "function"
+        ) {
+            await commandLoader.loadCommands();
+        }
+
         const command =
             await findCommand(
                 commandName
@@ -1116,6 +1126,26 @@ async function handleCommand(
 
             userId,
 
+
+            // Full compatibility context for all bundled commands.
+            // Some commands expect `message` while others use `msg`.
+            message: msg,
+
+            // React helper used by alive, antilink, and other commands.
+            react:
+                async emoji => {
+
+                    return await sock.sendMessage(
+                        msg.key.remoteJid,
+                        {
+                            react: {
+                                text: String(emoji),
+                                key: msg.key
+                            }
+                        }
+                    );
+
+                },
 
             reply:
 
