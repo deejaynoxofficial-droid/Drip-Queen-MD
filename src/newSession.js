@@ -110,6 +110,17 @@ const reconnectTimers = new Map();
 
 
 /* ==========================================
+   PAIRING RESTART TIMERS
+
+   WhatsApp intentionally closes the pre-login
+   socket with status 515 after a successful
+   companion registration. The next socket must
+   reuse the newly saved credentials.
+========================================== */
+const pairingRestartTimers = new Map();
+
+
+/* ==========================================
    CONNECTING SESSIONS
 ========================================== */
 
@@ -191,6 +202,64 @@ function clearReconnectTimer(userId) {
 
     }
 
+}
+
+
+function clearPairingRestartTimer(userId) {
+
+    const timer =
+        pairingRestartTimers.get(userId);
+
+    if (timer) {
+        clearTimeout(timer);
+        pairingRestartTimers.delete(userId);
+    }
+
+}
+
+
+function schedulePairingRestart(userId, delay = 1500) {
+
+    clearPairingRestartTimer(userId);
+
+    console.log(
+        `[PAIRING] ${userId}: 515 restart required; reconnecting with saved credentials in ${delay}ms`
+    );
+
+    const timer = setTimeout(async () => {
+
+        pairingRestartTimers.delete(userId);
+
+        try {
+            const sessionPath = path.join(config.SESSIONS_PATH, userId);
+            const credsPath = path.join(sessionPath, "creds.json");
+
+            if (!fs.existsSync(credsPath)) {
+                throw new Error("Saved credentials were not found after successful pairing");
+            }
+
+            console.log(
+                `[PAIRING] ${userId}: restarting authenticated session`
+            );
+
+            const sock = await connectSession(userId);
+
+            if (sock) {
+                console.log(
+                    `[PAIRING] ${userId}: authenticated restart requested successfully`
+                );
+            }
+
+        } catch (error) {
+            console.error(
+                `[PAIRING RESTART ERROR] ${userId}:`,
+                error.message
+            );
+        }
+
+    }, Math.max(250, Number(delay) || 1500));
+
+    pairingRestartTimers.set(userId, timer);
 }
 
 
@@ -1689,6 +1758,15 @@ async function shutdown() {
 
     reconnectTimers.clear();
 
+    for (
+        const timer
+        of pairingRestartTimers.values()
+    ) {
+        clearTimeout(timer);
+    }
+
+    pairingRestartTimers.clear();
+
 
     for (
         const [
@@ -1809,8 +1887,20 @@ async function generatePairingCode(phoneNumber) {
             console.error(`[PAIRING CLOSED] ${userId}: statusCode=${statusCode ?? "unknown"} reason=${reason}`);
             console.error(`[PAIRING CLOSED DETAIL] ${userId}: ${JSON.stringify(lastDisconnect?.error?.output || lastDisconnect?.error || {}, null, 2)}`);
 
+            /*
+               515 is expected immediately after WhatsApp accepts a new
+               companion login. It means the old pre-login stream MUST be
+               restarted. Do not delete the session here. The credentials
+               written by creds.update are now the authenticated session.
+            */
+            if (statusCode === DisconnectReason.restartRequired || statusCode === 515) {
+                schedulePairingRestart(userId, 1500);
+                return;
+            }
+
             if (statusCode === DisconnectReason.loggedOut) {
                 clearReconnectTimer(userId);
+                clearPairingRestartTimer(userId);
             }
         }
     });
@@ -1841,6 +1931,7 @@ async function generatePairingCode(phoneNumber) {
             code: cleanCode,
             pairingCode: cleanCode,
             status: "waiting_for_phone",
+            restartOnPair: true,
             version,
             browser: canonicalBrowser()
         };
