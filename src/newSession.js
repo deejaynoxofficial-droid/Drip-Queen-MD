@@ -25,9 +25,7 @@ let makeWASocket;
 let useMultiFileAuthState;
 let DisconnectReason;
 let fetchLatestBaileysVersion;
-let fetchLatestWaWebVersion;
 let makeCacheableSignalKeyStore;
-let Browsers;
 
 async function loadBaileys() {
     if (!baileysModule) {
@@ -37,57 +35,10 @@ async function loadBaileys() {
             useMultiFileAuthState,
             DisconnectReason,
             fetchLatestBaileysVersion,
-            fetchLatestWaWebVersion,
-            makeCacheableSignalKeyStore,
-            Browsers
+            makeCacheableSignalKeyStore
         } = baileysModule);
     }
     return baileysModule;
-}
-
-/* ==========================================
-   WHATSAPP WEB VERSION
-
-   fetchLatestBaileysVersion() can lag behind the
-   live WhatsApp Web client. For new-device pairing
-   this can produce a code that looks valid but is
-   rejected by WhatsApp. Prefer the live WA Web
-   revision and fall back safely when unavailable.
-========================================== */
-async function getWhatsAppWebVersion() {
-    const configured = String(process.env.WA_WEB_VERSION || "").trim();
-    if (configured) {
-        const parts = configured.split(".").map(Number);
-        if (parts.length === 3 && parts.every(Number.isInteger)) {
-            console.log(`[PAIRING] WA Web version override: ${parts.join(".")}`);
-            return parts;
-        }
-        console.warn(`[PAIRING] Ignoring invalid WA_WEB_VERSION: ${configured}`);
-    }
-
-    try {
-        if (typeof fetchLatestWaWebVersion === "function") {
-            const live = await fetchLatestWaWebVersion();
-            if (live?.version && live.version.length === 3) {
-                console.log(`[PAIRING] WA Web version: ${live.version.join(".")}`);
-                return live.version;
-            }
-        }
-    } catch (error) {
-        console.warn(`[PAIRING] Live WA Web version lookup failed: ${error.message}`);
-    }
-
-    const fallback = await fetchLatestBaileysVersion();
-    console.warn(`[PAIRING] Using Baileys fallback version: ${fallback.version.join(".")}`);
-    return fallback.version;
-}
-
-function canonicalBrowser() {
-    try {
-        if (Browsers?.macOS) return Browsers.macOS("Chrome");
-    } catch {}
-
-    return ["Mac OS", "Chrome", "1.0.0"];
 }
 
 const pino = require("pino");
@@ -107,17 +58,6 @@ const activeSessions = new Map();
 ========================================== */
 
 const reconnectTimers = new Map();
-
-
-/* ==========================================
-   PAIRING RESTART TIMERS
-
-   WhatsApp intentionally closes the pre-login
-   socket with status 515 after a successful
-   companion registration. The next socket must
-   reuse the newly saved credentials.
-========================================== */
-const pairingRestartTimers = new Map();
 
 
 /* ==========================================
@@ -205,63 +145,167 @@ function clearReconnectTimer(userId) {
 }
 
 
-function clearPairingRestartTimer(userId) {
+/* ==========================================
+   WELCOME MESSAGE
+========================================== */
 
-    const timer =
-        pairingRestartTimers.get(userId);
+function getWelcomeMarkerPath(userId) {
 
-    if (timer) {
-        clearTimeout(timer);
-        pairingRestartTimers.delete(userId);
-    }
-
+    return path.join(
+        config.SESSIONS_PATH,
+        String(userId),
+        ".welcome-sent"
+    );
 }
 
 
-function schedulePairingRestart(userId, delay = 1500) {
+async function sendWelcomeMessage(userId, sock) {
 
-    clearPairingRestartTimer(userId);
+    try {
 
-    console.log(
-        `[PAIRING] ${userId}: 515 restart required; reconnecting with saved credentials in ${delay}ms`
-    );
+        if (!sock?.user?.id) {
+            return false;
+        }
 
-    const timer = setTimeout(async () => {
+        const markerPath =
+            getWelcomeMarkerPath(userId);
 
-        pairingRestartTimers.delete(userId);
+        if (fs.existsSync(markerPath)) {
+            return false;
+        }
 
-        try {
-            const sessionPath = path.join(config.SESSIONS_PATH, userId);
-            const credsPath = path.join(sessionPath, "creds.json");
+        const creatorNames =
+            config.CREATORS ||
+            "NOX STAR.B & NOX STAR TECH";
 
-            if (!fs.existsSync(credsPath)) {
-                throw new Error("Saved credentials were not found after successful pairing");
-            }
+        const channel =
+            config.BOT_CHANNEL ||
+            "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
 
-            console.log(
-                `[PAIRING] ${userId}: restarting authenticated session`
+        const prefix =
+            config.PREFIX || ".";
+
+        /*
+         * The welcome card is sent with a real image instead of a
+         * plain-text-only message.  Replace public/bot.png to change
+         * the artwork without touching the JavaScript.
+         */
+        const configuredImage =
+            config.BOT_IMAGE_PATH ||
+            path.join(config.PUBLIC_PATH, "bot.png");
+
+        const imagePath =
+            path.isAbsolute(configuredImage)
+                ? configuredImage
+                : path.join(config.ROOT_DIR, configuredImage);
+
+        const caption = `
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃   👑 *DRIP QUEEN MD* 👑
+┃      *WHATSAPP BOT*
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+
+╭─〔 ✨ CONNECTION SUCCESSFUL 〕─╮
+│
+│  🎉 *WELCOME, YOUR BOT IS READY!*
+│
+│  Your WhatsApp account has been
+│  successfully paired and connected.
+│
+╰──────────────────────────────╯
+
+╭─〔 🤖 BOT INFORMATION 〕─╮
+│
+│  ▸ *Bot:* DRIP QUEEN MD
+│  ▸ *Creators:* ${creatorNames}
+│  ▸ *Prefix:* ${prefix}
+│  ▸ *Mode:* ${String(config.MODE || "public").toUpperCase()}
+│
+╰──────────────────────────╯
+
+╭─〔 🚀 QUICK START 〕─╮
+│
+│  📋 Type *${prefix}menu* to open the
+│     full command menu.
+│
+│  ⚡ Fast • Powerful • Multi-Device
+│  🔐 Secure session • Public mode
+│
+╰──────────────────────╯
+
+╭─〔 📢 OFFICIAL CHANNEL 〕─╮
+│
+│  🔗 *Follow DRIP QUEEN MD*
+│  ${channel}
+│
+│  🔔 Get updates, new features,
+│     commands & announcements.
+│
+╰────────────────────────────╯
+
+╭━━━━━━━━━━━━━━━━━━━━━━╮
+┃  ⭐ *POWERED BY NOX STAR TECH* ⭐
+┃  💚 *Stay Connected • We Are Family*
+╰━━━━━━━━━━━━━━━━━━━━━━╯`;
+
+        const messageContent = {
+            caption,
+            mimetype: "image/png"
+        };
+
+        if (fs.existsSync(imagePath)) {
+
+            messageContent.image =
+                fs.readFileSync(imagePath);
+
+            await sock.sendMessage(
+                sock.user.id,
+                messageContent
             );
 
-            const sock = await connectSession(userId);
+            console.log(
+                `[WELCOME] Image welcome card sent to ${userId}`
+            );
 
-            if (sock) {
-                console.log(
-                    `[PAIRING] ${userId}: authenticated restart requested successfully`
-                );
-            }
+        } else {
 
-        } catch (error) {
-            console.error(
-                `[PAIRING RESTART ERROR] ${userId}:`,
-                error.message
+            // Safe fallback if the custom welcome image is missing.
+            await sock.sendMessage(
+                sock.user.id,
+                { text: caption }
+            );
+
+            console.warn(
+                `[WELCOME] Image not found at ${imagePath}; sent text fallback.`
             );
         }
 
-    }, Math.max(250, Number(delay) || 1500));
+        fs.mkdirSync(
+            path.dirname(markerPath),
+            { recursive: true }
+        );
 
-    pairingRestartTimers.set(userId, timer);
+        fs.writeFileSync(
+            markerPath,
+            JSON.stringify({
+                sentAt: new Date().toISOString(),
+                version: config.BOT_VERSION || "1.0.0"
+            }),
+            "utf8"
+        );
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            `[WELCOME ERROR] ${userId}:`,
+            error.message
+        );
+
+        return false;
+    }
 }
-
 
 /* ==========================================
    ATTACH SESSION HANDLERS
@@ -470,7 +514,9 @@ async function connectSession(userId) {
         );
 
 
-        const version = await getWhatsAppWebVersion();
+        const {
+            version
+        } = await fetchLatestBaileysVersion();
 
 
         const {
@@ -517,7 +563,16 @@ async function connectSession(userId) {
                         level: "silent"
                     }),
 
-                browser: canonicalBrowser(),
+                browser: [
+
+                    config.BOT_NAME ||
+                    "DRIP QUEEN MD",
+
+                    "Chrome",
+
+                    "1.0.0"
+
+                ],
 
                 printQRInTerminal:
                     false,
@@ -562,7 +617,7 @@ async function connectSession(userId) {
 
             "connection.update",
 
-            update => {
+            async update => {
 
                 const {
 
@@ -607,6 +662,12 @@ async function connectSession(userId) {
 
                     console.log(
                         `[SESSION CONNECTED] ${userId}`
+                    );
+
+
+                    await sendWelcomeMessage(
+                        userId,
+                        sock
                     );
 
 
@@ -820,11 +881,27 @@ async function handleMessages(
             }
 
 
-            if (
-                msg.key?.fromMe
-            ) {
+            /*
+               Allow commands from the bot account's own
+               self-chat, but never process the bot's outgoing
+               messages in other chats. This makes .menu/.ping
+               work from a linked device as well.
+            */
+            if (msg.key?.fromMe) {
 
-                continue;
+                const ownJid =
+                    String(sock.user?.id || "").split(":")[0];
+
+                const remoteBase =
+                    String(msg.key?.remoteJid || "").split(":")[0];
+
+                if (
+                    !ownJid ||
+                    !remoteBase ||
+                    !remoteBase.startsWith(ownJid.split("@")[0])
+                ) {
+                    continue;
+                }
 
             }
 
@@ -902,7 +979,7 @@ async function handleMessages(
 
 function getMessageText(msg) {
 
-    const message =
+    let message =
         msg?.message;
 
 
@@ -911,6 +988,15 @@ function getMessageText(msg) {
         return "";
 
     }
+
+
+    // WhatsApp may wrap text inside ephemeral/view-once containers.
+    message =
+        message.ephemeralMessage?.message ||
+        message.viewOnceMessage?.message ||
+        message.viewOnceMessageV2?.message ||
+        message.viewOnceMessageV2Extension?.message ||
+        message;
 
 
     if (
@@ -1758,15 +1844,6 @@ async function shutdown() {
 
     reconnectTimers.clear();
 
-    for (
-        const timer
-        of pairingRestartTimers.values()
-    ) {
-        clearTimeout(timer);
-    }
-
-    pairingRestartTimers.clear();
-
 
     for (
         const [
@@ -1812,7 +1889,7 @@ async function generatePairingCode(phoneNumber) {
     }
 
     if (activeSessions.has(userId)) {
-        throw new Error("This number already has an active session. Cancel it before requesting another code.");
+        throw new Error("This number already has an active session.");
     }
 
     clearReconnectTimer(userId);
@@ -1825,122 +1902,123 @@ async function generatePairingCode(phoneNumber) {
 
     if (state.creds.registered) {
         connectingSessions.delete(userId);
-        throw new Error("This number already has saved WhatsApp credentials. Use the existing session or remove the old session first.");
+        throw new Error("This number already has saved WhatsApp credentials.");
     }
 
-    const version = await getWhatsAppWebVersion();
-
-    const socketLogger = pino({
-        level: process.env.PAIRING_LOG_LEVEL || "info"
-    });
+    const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
         auth: {
             creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, socketLogger)
+            keys: makeCacheableSignalKeyStore(
+                state.keys,
+                pino({ level: "silent" })
+            )
         },
-        logger: socketLogger,
-        browser: canonicalBrowser(),
+        logger: pino({ level: "silent" }),
+        browser: [config.BOT_NAME || "DRIP QUEEN MD", "Chrome", "1.0.0"],
         printQRInTerminal: false,
-        markOnlineOnConnect: false,
+        markOnlineOnConnect: true,
         syncFullHistory: false,
-        generateHighQualityLinkPreview: true,
-        connectTimeoutMs: 60000,
-        qrTimeout: 60000
+        generateHighQualityLinkPreview: true
     });
 
     activeSessions.set(userId, sock);
     sock.ev.on("creds.update", saveCreds);
     attachSessionHandlers(userId, sock);
 
-    let closed = false;
-    let opened = false;
-    let newLogin = false;
-
-    sock.ev.on("connection.update", update => {
-        const { connection, lastDisconnect, isNewLogin } = update;
-
-        if (isNewLogin) {
-            newLogin = true;
-            console.log(`[PAIRING] ${userId}: WhatsApp accepted new login; waiting for restart/open.`);
-        }
-
-        if (connection === "connecting") {
-            console.log(`[PAIRING] ${userId}: socket connecting`);
-        }
+    sock.ev.on("connection.update", async update => {
+        const { connection, lastDisconnect } = update;
 
         if (connection === "open") {
-            opened = true;
             connectingSessions.delete(userId);
-            console.log(`[PAIRING] ${userId}: connection OPEN`);
+            registerSession(userId, sock);
+            console.log(`[PAIRING] ${userId} connected successfully`);
+
+            await sendWelcomeMessage(userId, sock);
+            return;
         }
 
         if (connection === "close") {
-            closed = true;
             activeSessions.delete(userId);
             connectingSessions.delete(userId);
 
-            const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const reason = lastDisconnect?.error?.message || "unknown";
+            const statusCode =
+                lastDisconnect?.error?.output?.statusCode;
 
-            console.error(`[PAIRING CLOSED] ${userId}: statusCode=${statusCode ?? "unknown"} reason=${reason}`);
-            console.error(`[PAIRING CLOSED DETAIL] ${userId}: ${JSON.stringify(lastDisconnect?.error?.output || lastDisconnect?.error || {}, null, 2)}`);
-
-            /*
-               515 is expected immediately after WhatsApp accepts a new
-               companion login. It means the old pre-login stream MUST be
-               restarted. Do not delete the session here. The credentials
-               written by creds.update are now the authenticated session.
-            */
-            if (statusCode === DisconnectReason.restartRequired || statusCode === 515) {
-                schedulePairingRestart(userId, 1500);
-                return;
-            }
+            console.log(
+                `[PAIRING CLOSED] ${userId}: statusCode=${statusCode || "unknown"}`
+            );
 
             if (statusCode === DisconnectReason.loggedOut) {
                 clearReconnectTimer(userId);
-                clearPairingRestartTimer(userId);
+                return;
+            }
+
+            // 515 / restartRequired is expected immediately after
+            // WhatsApp accepts a pairing code. Keep the saved creds
+            // and rebuild the socket instead of treating pairing as failed.
+            if (config.AUTO_RECONNECT && !reconnectTimers.has(userId)) {
+                const delay =
+                    statusCode === DisconnectReason.restartRequired
+                        ? 1500
+                        : (Number(config.RECONNECT_DELAY) || 5000);
+
+                console.log(
+                    `[PAIRING RECONNECT] ${userId} in ${delay}ms`
+                );
+
+                const timer = setTimeout(async () => {
+                    reconnectTimers.delete(userId);
+
+                    try {
+                        await connectSession(userId);
+                    } catch (error) {
+                        console.error(
+                            `[PAIRING RECONNECT ERROR] ${userId}:`,
+                            error.message
+                        );
+                    }
+                }, delay);
+
+                reconnectTimers.set(userId, timer);
             }
         }
     });
 
-    // Give the socket a moment to establish its WebSocket/Noise transport.
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Baileys may need a short moment to initialize on slower hosts.
+    // Retry a few times instead of returning a false pairing failure.
+    let lastError = null;
 
-    if (closed || sock.ws?.readyState === 3) {
-        throw new Error("WhatsApp closed the pairing connection before a code could be requested. Check the Render logs for [PAIRING CLOSED] statusCode.");
+    for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+            await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 1200 : 1000));
+            const code = await sock.requestPairingCode(userId);
+            const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
+
+            if (!cleanCode) {
+                throw new Error("WhatsApp returned an empty pairing code.");
+            }
+
+            console.log(`[PAIRING] Code generated for ${userId}`);
+            return { number: userId, code: cleanCode };
+        } catch (error) {
+            lastError = error;
+            console.warn(`[PAIRING] Attempt ${attempt}/5 failed for ${userId}: ${error.message}`);
+        }
     }
+
+    connectingSessions.delete(userId);
 
     try {
-        // IMPORTANT: request exactly one code on one fresh socket.
-        // Repeated requests on the same socket can invalidate/replace the pairing state.
-        const code = await sock.requestPairingCode(userId);
-        const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
+        sock.ws?.close();
+    } catch {}
 
-        if (!cleanCode || cleanCode.length !== 8) {
-            throw new Error("WhatsApp returned an invalid pairing code.");
-        }
-
-        console.log(`[PAIRING] Code generated for ${userId}: ${cleanCode.slice(0, 4)}-${cleanCode.slice(4)}`);
-        console.log(`[PAIRING] Waiting for phone confirmation: ${userId}`);
-
-        return {
-            number: userId,
-            phoneNumber: userId,
-            code: cleanCode,
-            pairingCode: cleanCode,
-            status: "waiting_for_phone",
-            restartOnPair: true,
-            version,
-            browser: canonicalBrowser()
-        };
-    } catch (error) {
-        activeSessions.delete(userId);
-        connectingSessions.delete(userId);
-        try { sock.ws?.close(); } catch {}
-        throw error;
-    }
+    // Do not delete the auth directory here. If WhatsApp accepted the
+    // pairing, the credentials may already be valid and the reconnect
+    // handler must be allowed to resume the session.
+    throw lastError || new Error("Unable to generate WhatsApp pairing code.");
 }
 
 /* ==========================================
