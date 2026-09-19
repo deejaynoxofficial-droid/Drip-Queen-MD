@@ -25,7 +25,9 @@ let makeWASocket;
 let useMultiFileAuthState;
 let DisconnectReason;
 let fetchLatestBaileysVersion;
+let fetchLatestWaWebVersion;
 let makeCacheableSignalKeyStore;
+let Browsers;
 
 async function loadBaileys() {
     if (!baileysModule) {
@@ -35,7 +37,9 @@ async function loadBaileys() {
             useMultiFileAuthState,
             DisconnectReason,
             fetchLatestBaileysVersion,
-            makeCacheableSignalKeyStore
+            fetchLatestWaWebVersion,
+            makeCacheableSignalKeyStore,
+            Browsers
         } = baileysModule);
     }
     return baileysModule;
@@ -65,6 +69,10 @@ const reconnectTimers = new Map();
 ========================================== */
 
 const connectingSessions = new Set();
+
+
+/* Prevent concurrent pairing-code requests for the same number. */
+const pairingRequests = new Set();
 
 
 /* ==========================================
@@ -514,9 +522,22 @@ async function connectSession(userId) {
         );
 
 
-        const {
-            version
-        } = await fetchLatestBaileysVersion();
+        let version;
+
+        try {
+            const latest = await fetchLatestWaWebVersion();
+            version = latest?.version;
+
+            if (!Array.isArray(version) || version.length !== 3) {
+                throw new Error("Invalid live WhatsApp Web version");
+            }
+
+            console.log(`[SESSION] WA Web version: ${version.join(".")}`);
+        } catch (versionError) {
+            const fallback = await fetchLatestBaileysVersion();
+            version = fallback.version;
+            console.warn(`[SESSION] Live WA Web version unavailable; using Baileys fallback: ${version.join(".")}`);
+        }
 
 
         const {
@@ -563,16 +584,9 @@ async function connectSession(userId) {
                         level: "silent"
                     }),
 
-                browser: [
-
-                    config.BOT_NAME ||
-                    "DRIP QUEEN MD",
-
-                    "Chrome",
-
-                    "1.0.0"
-
-                ],
+                // IMPORTANT: use a canonical WhatsApp browser identity.
+                // Custom browser[0] labels can produce dead pairing codes.
+                browser: Browsers.macOS("Chrome"),
 
                 printQRInTerminal:
                     false,
@@ -979,78 +993,47 @@ async function handleMessages(
 
 function getMessageText(msg) {
 
-    let message =
-        msg?.message;
+    const message = msg?.message;
 
+    if (!message) return "";
 
-    if (!message) {
-
-        return "";
-
-    }
-
-
-    // WhatsApp may wrap text inside ephemeral/view-once containers.
-    message =
+    // Unwrap common WhatsApp containers.
+    const unwrapped =
         message.ephemeralMessage?.message ||
         message.viewOnceMessage?.message ||
         message.viewOnceMessageV2?.message ||
-        message.viewOnceMessageV2Extension?.message ||
+        message.documentWithCaptionMessage?.message ||
         message;
 
-
-    if (
-        typeof message.conversation ===
-        "string"
-    ) {
-
-        return message.conversation;
-
+    if (typeof unwrapped.conversation === "string") {
+        return unwrapped.conversation.trim();
     }
 
-
-    if (
-        typeof message.extendedTextMessage?.text ===
-        "string"
-    ) {
-
-        return message.extendedTextMessage.text;
-
+    if (typeof unwrapped.extendedTextMessage?.text === "string") {
+        return unwrapped.extendedTextMessage.text.trim();
     }
 
-
-    if (
-        typeof message.imageMessage?.caption ===
-        "string"
-    ) {
-
-        return message.imageMessage.caption;
-
+    if (typeof unwrapped.imageMessage?.caption === "string") {
+        return unwrapped.imageMessage.caption.trim();
     }
 
-
-    if (
-        typeof message.videoMessage?.caption ===
-        "string"
-    ) {
-
-        return message.videoMessage.caption;
-
+    if (typeof unwrapped.videoMessage?.caption === "string") {
+        return unwrapped.videoMessage.caption.trim();
     }
 
-
-    if (
-        typeof message.documentMessage?.caption ===
-        "string"
-    ) {
-
-        return message.documentMessage.caption;
-
+    if (typeof unwrapped.documentMessage?.caption === "string") {
+        return unwrapped.documentMessage.caption.trim();
     }
 
+    if (typeof unwrapped.buttonsResponseMessage?.selectedButtonId === "string") {
+        return unwrapped.buttonsResponseMessage.selectedButtonId.trim();
+    }
+
+    if (typeof unwrapped.listResponseMessage?.singleSelectReply?.selectedRowId === "string") {
+        return unwrapped.listResponseMessage.singleSelectReply.selectedRowId.trim();
+    }
 
     return "";
-
 }
 
 
@@ -1879,6 +1862,39 @@ async function shutdown() {
    GENERATE PAIRING CODE
 ========================================== */
 
+function waitForPairingSocketReady(sock, timeoutMs = 15000) {
+    if (!sock) return Promise.reject(new Error("Pairing socket was not created."));
+
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (fn, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try { sock.ev.off("connection.update", onUpdate); } catch {}
+            fn(value);
+        };
+
+        const onUpdate = update => {
+            if (update?.connection === "open" || update?.qr) {
+                finish(resolve);
+                return;
+            }
+
+            if (update?.connection === "close") {
+                const code = update?.lastDisconnect?.error?.output?.statusCode;
+                finish(reject, new Error(`Pairing socket closed before code request (status ${code || "unknown"})`));
+            }
+        };
+
+        const timer = setTimeout(() => {
+            finish(resolve);
+        }, timeoutMs);
+
+        sock.ev.on("connection.update", onUpdate);
+    });
+}
+
 async function generatePairingCode(phoneNumber) {
     await loadBaileys();
 
@@ -1892,6 +1908,11 @@ async function generatePairingCode(phoneNumber) {
         throw new Error("This number already has an active session.");
     }
 
+    if (pairingRequests.has(userId)) {
+        throw new Error("A pairing request is already in progress for this number. Wait for the current code to expire or restart the pairing attempt.");
+    }
+
+    pairingRequests.add(userId);
     clearReconnectTimer(userId);
     connectingSessions.add(userId);
 
@@ -1905,7 +1926,22 @@ async function generatePairingCode(phoneNumber) {
         throw new Error("This number already has saved WhatsApp credentials.");
     }
 
-    const { version } = await fetchLatestBaileysVersion();
+    let version;
+
+    try {
+        const latest = await fetchLatestWaWebVersion();
+        version = latest?.version;
+
+        if (!Array.isArray(version) || version.length !== 3) {
+            throw new Error("Invalid live WhatsApp Web version");
+        }
+
+        console.log(`[PAIRING] WA Web version: ${version.join(".")}`);
+    } catch (versionError) {
+        const fallback = await fetchLatestBaileysVersion();
+        version = fallback.version;
+        console.warn(`[PAIRING] Live WA Web version unavailable; using Baileys fallback: ${version.join(".")}`);
+    }
 
     const sock = makeWASocket({
         version,
@@ -1917,7 +1953,8 @@ async function generatePairingCode(phoneNumber) {
             )
         },
         logger: pino({ level: "silent" }),
-        browser: [config.BOT_NAME || "DRIP QUEEN MD", "Chrome", "1.0.0"],
+        // Canonical browser identity required for reliable pairing-code linking.
+        browser: Browsers.macOS("Chrome"),
         printQRInTerminal: false,
         markOnlineOnConnect: true,
         syncFullHistory: false,
@@ -1933,6 +1970,7 @@ async function generatePairingCode(phoneNumber) {
 
         if (connection === "open") {
             connectingSessions.delete(userId);
+            pairingRequests.delete(userId);
             registerSession(userId, sock);
             console.log(`[PAIRING] ${userId} connected successfully`);
 
@@ -1991,9 +2029,14 @@ async function generatePairingCode(phoneNumber) {
     // Retry a few times instead of returning a false pairing failure.
     let lastError = null;
 
+    try {
+        await waitForPairingSocketReady(sock, 15000);
+    } catch (readyError) {
+        console.warn(`[PAIRING] Socket readiness warning for ${userId}: ${readyError.message}`);
+    }
+
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
-            await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 1200 : 1000));
             const code = await sock.requestPairingCode(userId);
             const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
 
@@ -2010,6 +2053,7 @@ async function generatePairingCode(phoneNumber) {
     }
 
     connectingSessions.delete(userId);
+    pairingRequests.delete(userId);
 
     try {
         sock.ws?.close();
