@@ -45,58 +45,54 @@ async function loadBaileys() {
     return baileysModule;
 }
 
+/* ==========================================
+   WHATSAPP WEB VERSION
+
+   fetchLatestBaileysVersion() can lag behind the
+   live WhatsApp Web client. For new-device pairing
+   this can produce a code that looks valid but is
+   rejected by WhatsApp. Prefer the live WA Web
+   revision and fall back safely when unavailable.
+========================================== */
+async function getWhatsAppWebVersion() {
+    const configured = String(process.env.WA_WEB_VERSION || "").trim();
+    if (configured) {
+        const parts = configured.split(".").map(Number);
+        if (parts.length === 3 && parts.every(Number.isInteger)) {
+            console.log(`[PAIRING] WA Web version override: ${parts.join(".")}`);
+            return parts;
+        }
+        console.warn(`[PAIRING] Ignoring invalid WA_WEB_VERSION: ${configured}`);
+    }
+
+    try {
+        if (typeof fetchLatestWaWebVersion === "function") {
+            const live = await fetchLatestWaWebVersion();
+            if (live?.version && live.version.length === 3) {
+                console.log(`[PAIRING] WA Web version: ${live.version.join(".")}`);
+                return live.version;
+            }
+        }
+    } catch (error) {
+        console.warn(`[PAIRING] Live WA Web version lookup failed: ${error.message}`);
+    }
+
+    const fallback = await fetchLatestBaileysVersion();
+    console.warn(`[PAIRING] Using Baileys fallback version: ${fallback.version.join(".")}`);
+    return fallback.version;
+}
+
+function canonicalBrowser() {
+    try {
+        if (Browsers?.macOS) return Browsers.macOS("Chrome");
+    } catch {}
+
+    return ["Mac OS", "Chrome", "1.0.0"];
+}
+
 const pino = require("pino");
 
 const config = require("../config");
-
-/* ==========================================
-   LIVE WHATSAPP WEB VERSION + CANONICAL BROWSER
-========================================== */
-
-const DEFAULT_WA_WEB_VERSION = [2, 3000, 1043857760];
-
-async function getWhatsAppWebVersion() {
-    const raw = String(process.env.WA_WEB_VERSION || "").trim();
-
-    if (raw) {
-        const parsed = raw.split(/[.,\s-]+/).map(Number);
-        if (parsed.length === 3 && parsed.every(Number.isInteger)) {
-            console.log(`[PAIRING] Using WA_WEB_VERSION override: ${parsed.join(".")}`);
-            return parsed;
-        }
-    }
-
-    if (typeof fetchLatestWaWebVersion === "function") {
-        try {
-            const result = await fetchLatestWaWebVersion();
-            if (result?.version?.length === 3 && result?.isLatest !== false) {
-                console.log(`[PAIRING] Live WhatsApp Web version: ${result.version.join(".")}`);
-                return result.version;
-            }
-        } catch (error) {
-            console.warn(`[PAIRING] Live WA version lookup failed: ${error.message}`);
-        }
-    }
-
-    if (typeof fetchLatestBaileysVersion === "function") {
-        try {
-            const result = await fetchLatestBaileysVersion();
-            if (result?.version?.length === 3 && result?.isLatest) {
-                console.log(`[PAIRING] Baileys version fallback: ${result.version.join(".")}`);
-                return result.version;
-            }
-        } catch (error) {
-            console.warn(`[PAIRING] Baileys version lookup failed: ${error.message}`);
-        }
-    }
-
-    console.warn(`[PAIRING] Using fallback WA Web version: ${DEFAULT_WA_WEB_VERSION.join(".")}`);
-    return DEFAULT_WA_WEB_VERSION;
-}
-
-function getPairingBrowser() {
-    return Browsers?.macOS ? Browsers.macOS("Chrome") : ["Mac OS", "Chrome", "1.0.0"];
-}
 
 
 /* ==========================================
@@ -405,9 +401,7 @@ async function connectSession(userId) {
         );
 
 
-        const {
-            version
-        } = await fetchLatestBaileysVersion();
+        const version = await getWhatsAppWebVersion();
 
 
         const {
@@ -454,16 +448,7 @@ async function connectSession(userId) {
                         level: "silent"
                     }),
 
-                browser: [
-
-                    config.BOT_NAME ||
-                    "DRIP QUEEN MD",
-
-                    "Chrome",
-
-                    "1.0.0"
-
-                ],
+                browser: canonicalBrowser(),
 
                 printQRInTerminal:
                     false,
@@ -1749,111 +1734,122 @@ async function generatePairingCode(phoneNumber) {
     }
 
     if (activeSessions.has(userId)) {
-        throw new Error("This number already has an active session.");
+        throw new Error("This number already has an active session. Cancel it before requesting another code.");
     }
 
     clearReconnectTimer(userId);
     connectingSessions.add(userId);
 
     const sessionPath = path.join(config.SESSIONS_PATH, userId);
-
-    // Remove incomplete unregistered pairing state so a failed attempt cannot
-    // contaminate the next pairing-code request.
-    if (fs.existsSync(sessionPath)) {
-        try {
-            const existing = await useMultiFileAuthState(sessionPath);
-            if (existing.state.creds.registered) {
-                connectingSessions.delete(userId);
-                throw new Error("This number already has saved WhatsApp credentials.");
-            }
-        } catch (error) {
-            if (error.message.includes("already has saved WhatsApp credentials")) throw error;
-        }
-        fs.rmSync(sessionPath, { recursive: true, force: true });
-    }
     fs.mkdirSync(sessionPath, { recursive: true });
 
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+
+    if (state.creds.registered) {
+        connectingSessions.delete(userId);
+        throw new Error("This number already has saved WhatsApp credentials. Use the existing session or remove the old session first.");
+    }
+
     const version = await getWhatsAppWebVersion();
+
+    const socketLogger = pino({
+        level: process.env.PAIRING_LOG_LEVEL || "info"
+    });
 
     const sock = makeWASocket({
         version,
         auth: {
             creds: state.creds,
-            keys: makeCacheableSignalKeyStore(
-                state.keys,
-                pino({ level: "silent" })
-            )
+            keys: makeCacheableSignalKeyStore(state.keys, socketLogger)
         },
-        logger: pino({ level: "silent" }),
-        browser: getPairingBrowser(),
+        logger: socketLogger,
+        browser: canonicalBrowser(),
         printQRInTerminal: false,
-        markOnlineOnConnect: true,
+        markOnlineOnConnect: false,
         syncFullHistory: false,
-        generateHighQualityLinkPreview: true
+        generateHighQualityLinkPreview: true,
+        connectTimeoutMs: 60000,
+        qrTimeout: 60000
     });
 
     activeSessions.set(userId, sock);
     sock.ev.on("creds.update", saveCreds);
     attachSessionHandlers(userId, sock);
 
+    let closed = false;
+    let opened = false;
+    let newLogin = false;
+
     sock.ev.on("connection.update", update => {
         const { connection, lastDisconnect, isNewLogin } = update;
 
-        if (isNewLogin) console.log(`[PAIRING] ${userId} new login accepted by WhatsApp.`);
+        if (isNewLogin) {
+            newLogin = true;
+            console.log(`[PAIRING] ${userId}: WhatsApp accepted new login; waiting for restart/open.`);
+        }
+
+        if (connection === "connecting") {
+            console.log(`[PAIRING] ${userId}: socket connecting`);
+        }
 
         if (connection === "open") {
+            opened = true;
             connectingSessions.delete(userId);
-            console.log(`[PAIRING] ${userId} connected successfully`);
-            return;
+            console.log(`[PAIRING] ${userId}: connection OPEN`);
         }
 
         if (connection === "close") {
+            closed = true;
             activeSessions.delete(userId);
             connectingSessions.delete(userId);
 
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const message = lastDisconnect?.error?.message || "unknown";
-            console.error(`[PAIRING] ${userId} connection closed: status=${statusCode || "unknown"} message=${message}`);
+            const reason = lastDisconnect?.error?.message || "unknown";
+
+            console.error(`[PAIRING CLOSED] ${userId}: statusCode=${statusCode ?? "unknown"} reason=${reason}`);
+            console.error(`[PAIRING CLOSED DETAIL] ${userId}: ${JSON.stringify(lastDisconnect?.error?.output || lastDisconnect?.error || {}, null, 2)}`);
+
             if (statusCode === DisconnectReason.loggedOut) {
                 clearReconnectTimer(userId);
             }
         }
     });
 
-    // Baileys may need a short moment to initialize on slower hosts.
-    // Retry a few times instead of returning a false pairing failure.
-    let lastError = null;
+    // Give the socket a moment to establish its WebSocket/Noise transport.
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    for (let attempt = 1; attempt <= 5; attempt++) {
-        try {
-            await new Promise(resolve => setTimeout(resolve, attempt === 1 ? 2000 : 1500));
-            if (activeSessions.get(userId) !== sock || sock.ws?.isClosed || sock.ws?.isClosing) {
-                throw new Error("WhatsApp socket closed before pairing code request.");
-            }
-            const code = await sock.requestPairingCode(userId);
-            const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
-
-            if (!cleanCode) {
-                throw new Error("WhatsApp returned an empty pairing code.");
-            }
-
-            console.log(`[PAIRING] Code generated for ${userId}`);
-            return { number: userId, code: cleanCode };
-        } catch (error) {
-            lastError = error;
-            console.warn(`[PAIRING] Attempt ${attempt}/5 failed for ${userId}: ${error.message}`);
-        }
+    if (closed || sock.ws?.readyState === 3) {
+        throw new Error("WhatsApp closed the pairing connection before a code could be requested. Check the Render logs for [PAIRING CLOSED] statusCode.");
     }
 
-    activeSessions.delete(userId);
-    connectingSessions.delete(userId);
-
     try {
-        sock.ws?.close();
-    } catch {}
+        // IMPORTANT: request exactly one code on one fresh socket.
+        // Repeated requests on the same socket can invalidate/replace the pairing state.
+        const code = await sock.requestPairingCode(userId);
+        const cleanCode = String(code || "").replace(/[^A-Za-z0-9]/g, "");
 
-    throw lastError || new Error("Unable to generate WhatsApp pairing code.");
+        if (!cleanCode || cleanCode.length !== 8) {
+            throw new Error("WhatsApp returned an invalid pairing code.");
+        }
+
+        console.log(`[PAIRING] Code generated for ${userId}: ${cleanCode.slice(0, 4)}-${cleanCode.slice(4)}`);
+        console.log(`[PAIRING] Waiting for phone confirmation: ${userId}`);
+
+        return {
+            number: userId,
+            phoneNumber: userId,
+            code: cleanCode,
+            pairingCode: cleanCode,
+            status: "waiting_for_phone",
+            version,
+            browser: canonicalBrowser()
+        };
+    } catch (error) {
+        activeSessions.delete(userId);
+        connectingSessions.delete(userId);
+        try { sock.ws?.close(); } catch {}
+        throw error;
+    }
 }
 
 /* ==========================================
