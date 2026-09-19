@@ -207,20 +207,20 @@ async function sendWelcomeMessage(userId, sock) {
                 ? configuredImage
                 : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
-┃ ✨ Welcome, @user
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━╮
+┃ ✨ Welcome, ${user}
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
 ┃ 🔹 Prefix: ${prefix}
 ┃
-┃ 💎 Type ${prefix}menu to explore
+┃ 💎 Type ${prefix}menu to explore!
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ 👑 NOX STAR.B
-┃ 🛠️ NOX STAR TECH
-╰━━━━━━━━━━━━━━━━━╯`;
+┃ > 👑 NOX STAR BOT
+┃ > 🛠️ NOX STAR TECH
+╰━━━━━━━━━━━━━━╯`;
 
         const messageContent = {
             caption,
