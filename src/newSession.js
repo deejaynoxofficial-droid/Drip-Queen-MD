@@ -29,10 +29,17 @@ let fetchLatestWaWebVersion;
 let makeCacheableSignalKeyStore;
 let Browsers;
 let jidNormalizedUser;
+let areJidsSameUser;
 
 async function loadBaileys() {
     if (!baileysModule) {
-        baileysModule = await import("@whiskeysockets/baileys");
+        try {
+            baileysModule = await import("@whiskeysockets/baileys");
+        } catch (error) {
+            console.error("[BAILEYS LOAD ERROR] @whiskeysockets/baileys is not installed or could not be loaded.");
+            console.error("[BAILEYS LOAD ERROR] Run the Render build again after ensuring package.json uses a published Baileys version.");
+            throw error;
+        }
         ({
             default: makeWASocket,
             useMultiFileAuthState,
@@ -40,7 +47,8 @@ async function loadBaileys() {
             fetchLatestBaileysVersion,
             fetchLatestWaWebVersion,
             makeCacheableSignalKeyStore,
-            Browsers
+            Browsers,
+            areJidsSameUser
         } = baileysModule);
     }
     return baileysModule;
@@ -870,27 +878,47 @@ async function handleMessages(
 
 
             /*
-               Allow commands from the bot account's own
-               self-chat, but never process the bot's outgoing
-               messages in other chats. This makes .menu/.ping
-               work from a linked device as well.
+               FROM-ME / SELF-MESSAGE SUPPORT
+               --------------------------------
+               Baileys can expose the linked account's own messages with
+               key.fromMe=true. Older code compared only the phone-number
+               JID, which fails when WhatsApp uses a LID for the self chat.
+
+               We explicitly support both the account JID and account LID,
+               and use Baileys' JID comparison helper when available.
+               By default, only the bot's own self-chat is processed. This
+               prevents the bot from executing its own outgoing command text
+               in normal chats and creating command loops.
             */
             if (msg.key?.fromMe) {
+                const remoteJid = String(msg.key?.remoteJid || "").trim();
+                const ownJids = [
+                    sock.user?.id,
+                    sock.user?.lid
+                ].filter(Boolean).map(String);
 
-                const ownJid =
-                    String(sock.user?.id || "").split(":")[0];
+                const selfChat = ownJids.some(ownJid => {
+                    try {
+                        if (typeof areJidsSameUser === "function") {
+                            return areJidsSameUser(ownJid, remoteJid);
+                        }
+                    } catch {}
 
-                const remoteBase =
-                    String(msg.key?.remoteJid || "").split(":")[0];
+                    const normalize = value =>
+                        String(value || "").replace(/:.*(?=@)/, "").trim();
 
-                if (
-                    !ownJid ||
-                    !remoteBase ||
-                    !remoteBase.startsWith(ownJid.split("@")[0])
-                ) {
+                    return normalize(ownJid) === normalize(remoteJid);
+                });
+
+                const allowFromMe = config.PROCESS_FROM_ME !== false;
+                const allowFromMeEverywhere = config.PROCESS_FROM_ME_IN_ALL_CHATS === true;
+
+                if (!allowFromMe || (!selfChat && !allowFromMeEverywhere)) {
+                    console.log(`[FROM-ME IGNORED] ${userId} remote=${remoteJid} selfChat=${selfChat}`);
                     continue;
                 }
 
+                console.log(`[FROM-ME ACCEPTED] ${userId} remote=${remoteJid} selfChat=${selfChat}`);
             }
 
 
