@@ -699,9 +699,27 @@ async function connectSession(userId) {
 
 
                         console.log(
-                            `[SESSION] ${userId} logged out`
+                            `[SESSION] ${userId} logged out; clearing local auth state`
                         );
 
+                        const loggedOutPath = path.join(
+                            config.SESSIONS_PATH,
+                            userId
+                        );
+
+                        try {
+                            if (fs.existsSync(loggedOutPath)) {
+                                fs.rmSync(loggedOutPath, {
+                                    recursive: true,
+                                    force: true
+                                });
+                            }
+                        } catch (cleanupError) {
+                            console.error(
+                                `[SESSION CLEANUP ERROR] ${userId}:`,
+                                cleanupError.message
+                            );
+                        }
 
                         return;
 
@@ -1615,6 +1633,48 @@ function getSessions() {
 
 
 /* ==========================================
+   RESET SESSION FOR FRESH PAIRING
+   Removes only local auth state and closes the
+   current socket. It does NOT call sock.logout(),
+   which avoids asking WhatsApp to invalidate a
+   session that is already broken.
+========================================== */
+
+async function resetSession(userId) {
+    if (!userId) return false;
+
+    userId = String(userId).trim();
+    if (!userId) return false;
+
+    clearReconnectTimer(userId);
+    pairingRequests.delete(userId);
+    connectingSessions.delete(userId);
+
+    const sock = activeSessions.get(userId);
+    activeSessions.delete(userId);
+
+    if (sock) {
+        try {
+            sock.ev?.removeAllListeners?.("connection.update");
+            sock.ev?.removeAllListeners?.("messages.upsert");
+            sock.ws?.close();
+        } catch {}
+    }
+
+    const sessionPath = path.join(config.SESSIONS_PATH, userId);
+
+    if (fs.existsSync(sessionPath)) {
+        fs.rmSync(sessionPath, {
+            recursive: true,
+            force: true
+        });
+    }
+
+    console.log(`[SESSION RESET] ${userId}`);
+    return true;
+}
+
+/* ==========================================
    REMOVE SESSION
 ========================================== */
 
@@ -1922,6 +1982,27 @@ async function generatePairingCode(phoneNumber) {
 
             if (statusCode === DisconnectReason.loggedOut) {
                 clearReconnectTimer(userId);
+
+                const loggedOutPath = path.join(
+                    config.SESSIONS_PATH,
+                    userId
+                );
+
+                try {
+                    if (fs.existsSync(loggedOutPath)) {
+                        fs.rmSync(loggedOutPath, {
+                            recursive: true,
+                            force: true
+                        });
+                    }
+                } catch (cleanupError) {
+                    console.error(
+                        `[PAIRING CLEANUP ERROR] ${userId}:`,
+                        cleanupError.message
+                    );
+                }
+
+                pairingRequests.delete(userId);
                 return;
             }
 
@@ -2033,8 +2114,13 @@ module.exports = {
 
     removeSession,
 
+    resetSession,
+
     deleteSession:
         removeSession,
+
+    resetSessionForPairing:
+        resetSession,
 
 
     shutdown,
