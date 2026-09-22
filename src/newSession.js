@@ -203,8 +203,8 @@ async function sendWelcomeMessage(userId, sock) {
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━╮
-┃ ✨ Welcome, ${user}
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
+┃ ✨ Welcome, @user
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
@@ -214,9 +214,9 @@ async function sendWelcomeMessage(userId, sock) {
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ > 👑 NOX STAR BOT
-┃ > 🛠️ NOX STAR TECH
-╰━━━━━━━━━━━━━╯`;
+┃ 👑 NOX STAR.B
+┃ 🛠️ NOX STAR TECH
+╰━━━━━━━━━━━━━━━━━╯`;
 
         let target = sock.user.id;
         try {
@@ -832,8 +832,9 @@ async function handleMessages(
     messageUpdate
 ) {
 
-    const messages =
-        messageUpdate?.messages || [];
+    const messages = messageUpdate?.messages || [];
+
+    console.log(`[UPSERT] ${userId} type=${messageUpdate?.type || "unknown"} count=${messages.length}`);
 
 
     for (
@@ -1013,18 +1014,28 @@ async function handleCommand(
     msg,
     text
 ) {
-
     let commandName = "unknown";
 
     try {
-        const prefix = String(config.PREFIX || ".");
+        const configuredPrefixes = Array.isArray(config.PREFIXES)
+            ? config.PREFIXES
+            : [config.PREFIX || "."];
+
+        const prefixes = [...new Set(
+            configuredPrefixes
+                .map(p => String(p || "").trim())
+                .filter(Boolean)
+                .sort((a, b) => b.length - a.length)
+        )];
+
         const normalizedText = String(text || "")
             .replace(/[\u200B-\u200D\uFEFF]/g, "")
             .trim();
 
-        if (!normalizedText || !normalizedText.startsWith(prefix)) {
-            return false;
-        }
+        if (!normalizedText) return false;
+
+        const prefix = prefixes.find(p => normalizedText.startsWith(p));
+        if (!prefix) return false;
 
         const body = normalizedText.slice(prefix.length).trim();
         if (!body) return false;
@@ -1034,12 +1045,17 @@ async function handleCommand(
         const args = parts;
         if (!commandName) return false;
 
+        const chatId = msg?.key?.remoteJid;
+        if (!chatId) return false;
+
+        console.log(`[COMMAND DETECTED] ${userId} -> ${prefix}${commandName} | chat=${chatId}`);
+
         if (!commandLoader) {
             throw new Error("Command loader is unavailable");
         }
 
-        // Load once if startup did not populate the registry.
         if (!commandLoader.isLoaded?.()) {
+            console.log("[COMMANDS] Registry empty; loading commands now...");
             await commandLoader.loadCommands();
         }
 
@@ -1049,14 +1065,14 @@ async function handleCommand(
             return false;
         }
 
-        const chatId = msg?.key?.remoteJid;
-        if (!chatId) return false;
-
-        console.log(`[COMMAND] Executing ${prefix}${commandName} for ${userId}`);
+        const sender = msg.key?.participant || msg.key?.remoteJid || userId;
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
 
         const context = {
             sock,
+            conn: sock,
             client: sock,
+            wa: sock,
             msg,
             message: msg,
             m: msg,
@@ -1066,24 +1082,31 @@ async function handleCommand(
             commandName,
             command: command.name,
             prefix,
-            sender: msg.key?.participant || chatId,
+            prefixes,
+            sender,
+            senderJid: sender,
             from: chatId,
+            chat: chatId,
             chatId,
             jid: chatId,
             userId,
-            pushName: msg.pushName || "User",
+            pushName: msg.pushName || msg.key?.pushName || "User",
             isGroup: chatId.endsWith("@g.us"),
             isFromMe: Boolean(msg.key?.fromMe),
+            quoted,
+            quotedMessage: quoted,
 
             reply: async (message, options = {}) => {
-                const content = typeof message === "string"
-                    ? { text: message }
-                    : message;
+                const content = typeof message === "string" ? { text: message } : message;
                 return sock.sendMessage(chatId, content, { quoted: msg, ...options });
             },
 
             sendMessage: async (content, options = {}) => {
                 return sock.sendMessage(chatId, content, { quoted: msg, ...options });
+            },
+
+            sendText: async message => {
+                return sock.sendMessage(chatId, { text: String(message) }, { quoted: msg });
             },
 
             react: async emoji => {
@@ -1092,21 +1115,32 @@ async function handleCommand(
                 });
             },
 
-            sendText: async message => {
-                return sock.sendMessage(chatId, { text: String(message) }, { quoted: msg });
+            sendReaction: async emoji => {
+                return sock.sendMessage(chatId, {
+                    react: { text: String(emoji), key: msg.key }
+                });
             }
         };
 
-        let executor = null;
-        if (typeof command.execute === "function") executor = command.execute;
-        else if (typeof command.run === "function") executor = command.run;
-        else if (typeof command.handler === "function") executor = command.handler;
+        console.log(`[COMMAND] Executing ${prefix}${commandName} (${command.name})`);
 
-        if (!executor) {
-            throw new Error(`Command "${command.name}" has no execution function`);
+        // Use the command loader's own executor so execute/run/handler commands
+        // all follow one consistent path.
+        if (typeof commandLoader.executeCommand === "function") {
+            const result = await commandLoader.executeCommand(commandName, context);
+            if (!result?.success) {
+                throw new Error(result?.error || `Command "${command.name}" failed`);
+            }
+        } else {
+            const executor =
+                typeof command.execute === "function" ? command.execute :
+                typeof command.run === "function" ? command.run :
+                typeof command.handler === "function" ? command.handler : null;
+
+            if (!executor) throw new Error(`Command "${command.name}" has no execution function`);
+            await executor(context);
         }
 
-        await executor(context);
         console.log(`[COMMAND] Completed ${prefix}${commandName}`);
         return true;
 
@@ -1123,11 +1157,9 @@ async function handleCommand(
         } catch (replyError) {
             console.error("[COMMAND ERROR REPLY FAILED]", replyError.message);
         }
-
         return false;
     }
 }
-
 
 /* ==========================================
    FIND COMMAND
