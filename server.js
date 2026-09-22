@@ -25,7 +25,8 @@ const config = require(
 const {
     generatePairingCode,
     getSessions,
-    removeSession: disconnectSession
+    removeSession: disconnectSession,
+    resetSession
 } = require("./src/newSession");
 
 
@@ -490,6 +491,54 @@ app.post(
 
     }
 
+);
+
+
+/* ==========================================
+   API - RESET SESSION FOR FRESH PAIRING
+   Use this when a saved Signal session is
+   producing Bad MAC/decryption failures.
+========================================== */
+
+app.post(
+    "/api/session/reset",
+    async (req, res) => {
+        try {
+            let { number, phoneNumber, userId } = req.body || {};
+            const raw = number || phoneNumber || userId;
+
+            if (!raw) {
+                return res.status(400).json({
+                    success: false,
+                    message: "WhatsApp number is required."
+                });
+            }
+
+            const normalized = String(raw).replace(/\D/g, "");
+
+            if (normalized.length < 8 || normalized.length > 16) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Please enter a valid number with country code."
+                });
+            }
+
+            await resetSession(normalized);
+
+            return res.json({
+                success: true,
+                message: "Local session reset. Generate a new pairing code now.",
+                number: normalized
+            });
+        } catch (error) {
+            console.error("[SESSION RESET API ERROR]", error.message);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Failed to reset session."
+            });
+        }
+    }
 );
 
 

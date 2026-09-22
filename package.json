@@ -19,7 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "6.7.24",
+    "@whiskeysockets/baileys": "github:WhiskeySockets/Baileys#9a0938f",
     "axios": "^1.7.9",
     "chalk": "^4.1.2",
     "dotenv": "^16.4.7",
