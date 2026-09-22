@@ -94,6 +94,24 @@ const config = {
 
 
     /* ==========================================
+       FROM-ME / SELF MESSAGE SUPPORT
+       ==========================================
+       Process commands sent from the bot account itself in its self-chat.
+       Set PROCESS_FROM_ME_IN_ALL_CHATS=true only if you intentionally want
+       commands sent by the linked account in groups/private chats processed.
+    */
+
+    PROCESS_FROM_ME:
+
+        String(process.env.PROCESS_FROM_ME || "true").toLowerCase() !== "false",
+
+
+    PROCESS_FROM_ME_IN_ALL_CHATS:
+
+        String(process.env.PROCESS_FROM_ME_IN_ALL_CHATS || "false").toLowerCase() === "true",
+
+
+    /* ==========================================
        ADMIN DASHBOARD AUTHENTICATION
        Prefer setting these in .env in production.
     ========================================== */
