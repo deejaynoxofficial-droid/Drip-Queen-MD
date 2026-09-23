@@ -163,7 +163,9 @@ execute: async ({
     from,
     sock,
     reply,
-    react
+    react,
+    isFromMe,
+    isOwner: contextIsOwner
 }) => {
     try {
         const subscribers =
@@ -271,7 +273,7 @@ ${config.PREFIX}subscribe
         ) {
 
             // SECURITY CHECK
-            if (!isOwner(sender)) {
+            if (!(Boolean(isFromMe) || Boolean(contextIsOwner) || isOwner(sender))) {
                 await react("❌");
 
                 return await reply(`
