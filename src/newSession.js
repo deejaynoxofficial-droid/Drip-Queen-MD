@@ -892,33 +892,73 @@ async function handleMessages(
             */
             if (msg.key?.fromMe) {
                 const remoteJid = String(msg.key?.remoteJid || "").trim();
+                const remoteJidAlt = String(msg.key?.remoteJidAlt || "").trim();
+
+                /*
+                   WhatsApp self-chat can now arrive as an @lid JID while the
+                   authenticated account is exposed as @s.whatsapp.net.
+                   Comparing the raw JIDs (or even areJidsSameUser()) is not
+                   enough because the LID number and phone number are different
+                   identifiers. Resolve both directions through Baileys' LID
+                   mapping when it is available.
+                */
+                const candidates = [
+                    remoteJid,
+                    remoteJidAlt,
+                    msg.key?.participant,
+                    msg.key?.participantAlt
+                ].filter(Boolean).map(String);
+
                 const ownJids = [
                     sock.user?.id,
                     sock.user?.lid
                 ].filter(Boolean).map(String);
 
-                const selfChat = ownJids.some(ownJid => {
-                    try {
-                        if (typeof areJidsSameUser === "function") {
-                            return areJidsSameUser(ownJid, remoteJid);
+                try {
+                    const pn = String(sock.user?.id || "").trim();
+                    const lidMapping = sock.signalRepository?.lidMapping;
+
+                    if (lidMapping && pn) {
+                        const mappedLid = await lidMapping.getLIDForPN(pn);
+                        if (mappedLid) ownJids.push(String(mappedLid));
+                    }
+
+                    for (const candidate of [...candidates]) {
+                        if (candidate.endsWith("@lid") && lidMapping?.getPNForLID) {
+                            const mappedPn = await lidMapping.getPNForLID(candidate);
+                            if (mappedPn) candidates.push(String(mappedPn));
                         }
-                    } catch {}
+                    }
+                } catch (mappingError) {
+                    console.warn(`[FROM-ME LID MAP] ${userId}: ${mappingError.message}`);
+                }
 
-                    const normalize = value =>
-                        String(value || "").replace(/:.*(?=@)/, "").trim();
+                const normalize = value =>
+                    String(value || "").replace(/:.*(?=@)/, "").trim();
 
-                    return normalize(ownJid) === normalize(remoteJid);
-                });
+                const selfChat = candidates.some(candidate =>
+                    ownJids.some(ownJid => {
+                        const a = normalize(candidate);
+                        const b = normalize(ownJid);
+                        if (a === b) return true;
+
+                        try {
+                            return typeof areJidsSameUser === "function" && areJidsSameUser(a, b);
+                        } catch {
+                            return false;
+                        }
+                    })
+                );
 
                 const allowFromMe = config.PROCESS_FROM_ME !== false;
                 const allowFromMeEverywhere = config.PROCESS_FROM_ME_IN_ALL_CHATS === true;
 
                 if (!allowFromMe || (!selfChat && !allowFromMeEverywhere)) {
-                    console.log(`[FROM-ME IGNORED] ${userId} remote=${remoteJid} selfChat=${selfChat}`);
+                    console.log(`[FROM-ME IGNORED] ${userId} remote=${remoteJid} alt=${remoteJidAlt || "-"} selfChat=${selfChat}`);
                     continue;
                 }
 
-                console.log(`[FROM-ME ACCEPTED] ${userId} remote=${remoteJid} selfChat=${selfChat}`);
+                console.log(`[FROM-ME ACCEPTED] ${userId} remote=${remoteJid} alt=${remoteJidAlt || "-"} selfChat=${selfChat}`);
             }
 
 
@@ -1094,7 +1134,7 @@ async function handleCommand(
         const chatId = msg?.key?.remoteJid;
         if (!chatId) return false;
 
-        console.log(`[COMMAND DETECTED] ${userId} -> ${prefix}${commandName} | chat=${chatId}`);
+        console.log(`[COMMAND DETECTED] ${userId} -> ${prefix}${commandName} | chat=${chatId} | fromMe=${Boolean(msg.key?.fromMe)}`);
 
         if (!commandLoader) {
             throw new Error("Command loader is unavailable");
@@ -1121,6 +1161,10 @@ async function handleCommand(
             ? (sock.user?.id || sock.user?.lid || msg.key?.participant || msg.key?.remoteJid || userId)
             : (msg.key?.participant || msg.key?.remoteJid || userId);
 
+        const senderJid = isFromMe
+            ? (msg.key?.participant || msg.key?.remoteJid || sender)
+            : sender;
+
         const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
 
         const context = {
@@ -1139,7 +1183,7 @@ async function handleCommand(
             prefix,
             prefixes,
             sender,
-            senderJid: sender,
+            senderJid,
             from: chatId,
             chat: chatId,
             chatId,
