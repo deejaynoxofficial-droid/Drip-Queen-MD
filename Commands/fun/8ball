@@ -72,9 +72,9 @@ ${config.PREFIX}8ball Will I be successful?
             await react("🔮");
 
             await reply(`
-╔══════════════════════════════╗
+╔═════════════════════════╗
 ║       🔮 MAGIC 8-BALL        ║
-╚══════════════════════════════╝
+╚═════════════════════════╝
 
 ╭─〔 YOUR QUESTION 〕
 │
