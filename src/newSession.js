@@ -212,7 +212,7 @@ async function sendWelcomeMessage(userId, sock) {
             : path.join(config.ROOT_DIR, configuredImage);
 
         const caption = `╭━〔 👑 DRIP QUEEN MD 〕━╮
-┃ ✨ Welcome, ${user}
+┃ ✨ Welcome, 🤗🤗🤗
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
