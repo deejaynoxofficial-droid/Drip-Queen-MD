@@ -1111,7 +1111,16 @@ async function handleCommand(
             return false;
         }
 
-        const sender = msg.key?.participant || msg.key?.remoteJid || userId;
+        const isFromMe = Boolean(msg.key?.fromMe);
+
+        // For self-chat/fromMe messages, WhatsApp may expose the chat JID as
+        // our LID instead of our phone-number JID. Commands that perform
+        // owner/admin checks need the actual account identity, not the chat
+        // address. Prefer the authenticated account JID for fromMe messages.
+        const sender = isFromMe
+            ? (sock.user?.id || sock.user?.lid || msg.key?.participant || msg.key?.remoteJid || userId)
+            : (msg.key?.participant || msg.key?.remoteJid || userId);
+
         const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
 
         const context = {
@@ -1138,7 +1147,12 @@ async function handleCommand(
             userId,
             pushName: msg.pushName || msg.key?.pushName || "User",
             isGroup: chatId.endsWith("@g.us"),
-            isFromMe: Boolean(msg.key?.fromMe),
+            isFromMe,
+            // A command typed by the authenticated account itself is always
+            // treated as an owner-originated command. This is deliberately
+            // limited to fromMe messages; ordinary users still go through
+            // the normal command-specific permission checks.
+            isOwner: isFromMe,
             quoted,
             quotedMessage: quoted,
 
