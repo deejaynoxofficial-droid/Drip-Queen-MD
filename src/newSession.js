@@ -222,8 +222,8 @@ async function sendWelcomeMessage(userId, sock) {
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ >👑 DRIP QUEEN MD 👸 
-┃ >🛠️ NOX STAR TECH
+┃ > ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 ╰━━━━━━━━━━━━━━━━━╯`;
 
         let target = sock.user.id;
