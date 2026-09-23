@@ -198,9 +198,9 @@ function buildMainMenu(
     prefix
 ) {
 
-    return `╔══════════════════════╗
+    return `╔═══════════════════╗
 ║   🤖 DRIP QUEEN MD   ║
-╚══════════════════════╝
+╚═══════════════════╝
 
 Hello ${userName} 👋
 
