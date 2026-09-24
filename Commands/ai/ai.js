@@ -403,7 +403,7 @@ module.exports = {
 │ ${answer}
 │
 ╰───────────────
-Powered by ${config.BOT_NAME}`;
+> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`;
 
 
             await sock.sendMessage(
