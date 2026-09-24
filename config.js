@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const path = require("path");
+const fs = require("fs");
 
 
 /* ==========================================
@@ -593,6 +594,37 @@ const config = {
     }
 
 };
+
+
+/* ==========================================
+   LOAD PERSISTED BOT SETTINGS
+   Values saved by .settings survive restarts.
+========================================== */
+
+try {
+    const settingsPath = path.join(ROOT_DIR, "database", "settings.json");
+    if (fs.existsSync(settingsPath)) {
+        const saved = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+
+        if (typeof saved.botName === "string" && saved.botName.trim()) {
+            config.BOT_NAME = saved.botName.trim();
+        }
+
+        if (typeof saved.creator === "string" && saved.creator.trim()) {
+            config.CREATOR = saved.creator.trim();
+        }
+
+        if (typeof saved.prefix === "string" && saved.prefix.trim()) {
+            config.PREFIX = saved.prefix.trim();
+        }
+
+        if (typeof saved.mode === "string" && saved.mode.trim()) {
+            config.MODE = saved.mode.trim().toLowerCase();
+        }
+    }
+} catch (error) {
+    console.warn("[CONFIG] Could not load persisted bot settings:", error.message);
+}
 
 
 /* ==========================================
