@@ -176,67 +176,163 @@ function getWelcomeMarkerPath(userId) {
 }
 
 
-// ===============================
-// DRIP QUEEN MD V17 WELCOME SYSTEM
-// ===============================
+const welcomeTimers = new Map();
 
-async function sendWelcomeMessage(sock) {
+function scheduleWelcomeMessage(userId, sock) {
+    if (!userId || !sock) return;
+    if (welcomeTimers.has(userId)) {
+        console.log(`[WELCOME] Already scheduled for ${userId}`);
+        return;
+    }
+
+    console.log(`[WELCOME TRIGGER] Scheduling welcome for ${userId} in 3500ms`);
+    const timer = setTimeout(async () => {
+        welcomeTimers.delete(userId);
+        console.log(`[WELCOME TRIGGER] Running welcome for ${userId}`);
+        await sendWelcomeMessage(userId, sock);
+    }, 3500);
+    welcomeTimers.set(userId, timer);
+}
+
+async function sendWelcomeMessage(userId, sock) {
+
+    const WELCOME_VERSION = "welcome-v2-audio";
+
     try {
-        console.log("[WELCOME TRIGGER] Starting welcome process");
+        if (!sock?.user?.id) {
+            console.warn(`[WELCOME] No bot JID available for ${userId}`);
+            return false;
+        }
 
-        const ownerJid = sock.user.id;
+        const markerPath = getWelcomeMarkerPath(userId);
+        let marker = null;
+        try {
+            if (fs.existsSync(markerPath)) {
+                marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
+            }
+        } catch {}
 
-        // Get WhatsApp display name
-        const userName =
+        if (marker?.version === WELCOME_VERSION) {
+            console.log(`[WELCOME] Already sent for ${userId}`);
+            return false;
+        }
+
+        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
+        const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
+        const prefix = config.PREFIX || ".";
+        const displayName = String(
             sock.user?.name ||
             sock.user?.verifiedName ||
-            "DRIP USER";
+            userId ||
+            "there"
+        ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const welcomeText = `
-╭━━━━━━━━━━━━━━━━━━━━╮
-┃ 👑 DRIP QUEEN MD
-┃
-┃ ✨ Welcome, ${userName}!
-┃
-┃ 🤖 Bot connected successfully
-┃
-┃ ⚡ Mode    : Public
-┃ 🔹 Prefix  : .
-┃ 📦 Version : 1
-┃
-┃ 💎 Type .menu to explore
-┃
-┃ 👑 NOX STAR TECH
-╰━━━━━━━━━━━━━━━━━━━━╯
-`;
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
+        const imagePath = path.isAbsolute(configuredImage)
+            ? configuredImage
+            : path.join(config.ROOT_DIR, configuredImage);
 
-        console.log("[WELCOME TARGET]", ownerJid);
+        const audioPath = path.join(config.ROOT_DIR, "assets", "audio", "welcome.ogg");
 
-        // Send image + text
-        await sock.sendMessage(ownerJid, {
-            image: {
-                url: "./assets/bot.png"
-            },
-            caption: welcomeText
-        });
+        console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        console.log("[WELCOME IMAGE] Sent successfully");
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 DRIP QUEEN MD      ┃
+┃                              ┃
+┃      ✨ Welcome, ${displayName}!
+┃                              ┃
+┃   🤖 Your WhatsApp bot is   ┃
+┃      now connected.          ┃
+┃                              ┃
+┃   ⚡ Mode    : Public        ┃
+┃   🔹 Prefix  : ${prefix}             ┃
+┃   📦 Version : 1             ┃
+┃                              ┃
+┃   💎 Type ${prefix}menu to explore ┃
+┃                              ┃
+┃   📢 Official Channel        ┃
+┃   ${channel}
+┃                              ┃
+┃       👑 ${creatorNames}      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
+        const targets = [];
+        const addTarget = value => {
+            if (!value || typeof value !== "string") return;
+            try {
+                const normalized = jidNormalizedUser(value);
+                if (normalized && !targets.includes(normalized)) targets.push(normalized);
+            } catch {}
+            if (!targets.includes(value)) targets.push(value);
+        };
 
-        // Send audio separately
-        await sock.sendMessage(ownerJid, {
-            audio: {
-                url: "./assets/audio/welcome.ogg"
-            },
-            mimetype: "audio/ogg; codecs=opus",
-            ptt: true
-        });
+        addTarget(sock.user.id);
+        addTarget(sock.user.lid);
 
-        console.log("[WELCOME AUDIO] Sent successfully");
+        const phone = String(userId || "").replace(/\D/g, "");
+        if (phone) addTarget(`${phone}@s.whatsapp.net`);
 
+        console.log(`[WELCOME TARGETS] ${userId}: ${targets.join(", ")}`);
 
-    } catch (err) {
-        console.log("[WELCOME ERROR]", err);
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        let sent = false;
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+            for (const target of targets) {
+                try {
+                    if (fs.existsSync(imagePath)) {
+                        await sock.sendMessage(target, {
+                            image: fs.readFileSync(imagePath),
+                            caption
+                        });
+                    } else {
+                        await sock.sendMessage(target, { text: caption });
+                    }
+
+                    // Send a separate voice/audio welcome immediately after the text/image card.
+                    if (!fs.existsSync(audioPath)) {
+                        throw new Error(`Welcome audio file missing: ${audioPath}`);
+                    }
+
+                    await sock.sendMessage(target, {
+                        audio: fs.readFileSync(audioPath),
+                        mimetype: "audio/ogg; codecs=opus",
+                        ptt: false
+                    });
+                    console.log(`[WELCOME AUDIO] Sent successfully to ${target} for ${userId}`);
+
+                    sent = true;
+                    console.log(`[WELCOME] Sent successfully to ${target} for ${userId}`);
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`[WELCOME] Send failed to ${target} (attempt ${attempt}): ${error.message}`);
+                }
+            }
+
+            if (!sent && attempt < 3) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+
+        if (!sent) {
+            throw lastError || new Error("Unable to deliver welcome message to paired account.");
+        }
+
+        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+        fs.writeFileSync(markerPath, JSON.stringify({
+            sentAt: new Date().toISOString(),
+            version: WELCOME_VERSION,
+            botVersion: "1.0.0"
+        }, null, 2), "utf8");
+
+        return true;
+
+    } catch (error) {
+        console.error(`[WELCOME ERROR] ${userId}:`, error.stack || error.message);
+        return false;
     }
 }
 
@@ -604,7 +700,7 @@ async function connectSession(userId) {
                     );
 
 
-                    await sendWelcomeMessage(
+                    scheduleWelcomeMessage(
                         userId,
                         sock
                     );
@@ -1954,86 +2050,7 @@ async function generatePairingCode(phoneNumber) {
     sock.ev.on("creds.update", saveCreds);
     attachSessionHandlers(userId, sock);
 
-    sock.ev.on("connection.update", async update => {
-        const { connection, lastDisconnect } = update;
-
-        if (connection === "open") {
-            connectingSessions.delete(userId);
-            pairingRequests.delete(userId);
-            registerSession(userId, sock);
-            console.log(`[PAIRING] ${userId} connected successfully`);
-
-            await sendWelcomeMessage(userId, sock);
-            return;
-        }
-
-        if (connection === "close") {
-            activeSessions.delete(userId);
-            connectingSessions.delete(userId);
-
-            const statusCode =
-                lastDisconnect?.error?.output?.statusCode;
-
-            console.log(
-                `[PAIRING CLOSED] ${userId}: statusCode=${statusCode || "unknown"}`
-            );
-
-            if (statusCode === DisconnectReason.loggedOut) {
-                clearReconnectTimer(userId);
-
-                const loggedOutPath = path.join(
-                    config.SESSIONS_PATH,
-                    userId
-                );
-
-                try {
-                    if (fs.existsSync(loggedOutPath)) {
-                        fs.rmSync(loggedOutPath, {
-                            recursive: true,
-                            force: true
-                        });
-                    }
-                } catch (cleanupError) {
-                    console.error(
-                        `[PAIRING CLEANUP ERROR] ${userId}:`,
-                        cleanupError.message
-                    );
-                }
-
-                pairingRequests.delete(userId);
-                return;
-            }
-
-            // 515 / restartRequired is expected immediately after
-            // WhatsApp accepts a pairing code. Keep the saved creds
-            // and rebuild the socket instead of treating pairing as failed.
-            if (config.AUTO_RECONNECT && !reconnectTimers.has(userId)) {
-                const delay =
-                    statusCode === DisconnectReason.restartRequired
-                        ? 1500
-                        : (Number(config.RECONNECT_DELAY) || 5000);
-
-                console.log(
-                    `[PAIRING RECONNECT] ${userId} in ${delay}ms`
-                );
-
-                const timer = setTimeout(async () => {
-                    reconnectTimers.delete(userId);
-
-                    try {
-                        await connectSession(userId);
-                    } catch (error) {
-                        console.error(
-                            `[PAIRING RECONNECT ERROR] ${userId}:`,
-                            error.message
-                        );
-                    }
-                }, delay);
-
-                reconnectTimers.set(userId, timer);
-            }
-        }
-    });
+    console.log(`[BUILD] Drip Queen MD welcome-v2-audio loaded for ${userId}`);
 
     // Baileys may need a short moment to initialize on slower hosts.
     // Retry a few times instead of returning a false pairing failure.
