@@ -74,7 +74,7 @@ execute: async ({
 │
 ╰────────────────────
 
-«Thank you for using DRIP QUEEN MD 👑
+> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}
 `;
 
         await reply(message);
@@ -88,7 +88,7 @@ execute: async ({
         try {
             await reply(`
 
-🤖 ${config.BOT_NAME}
+> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}
 
 👑 Creator: ${config.CREATOR}
 ⚡ Version: ${config.BOT_VERSION}

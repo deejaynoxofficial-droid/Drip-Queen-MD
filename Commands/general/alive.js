@@ -52,7 +52,7 @@ execute: async ({
 │ 👑 Creator: ${config.CREATOR}
 ╰────────────────────
 
-«Drip Queen MD is active and ready! 🚀
+> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}
 `;
 
         await reply(aliveMessage);

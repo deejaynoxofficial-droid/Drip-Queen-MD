@@ -98,6 +98,63 @@ const categoryEmojis = {
 
 
 /* ==========================================
+   COMMAND EMOJIS
+========================================== */
+
+const commandEmojis = {
+    alive: "🟢",
+    botinfo: "🤖",
+    menu: "📋",
+    pair: "🔗",
+    channel: "📢",
+    channelfollows: "📢",
+    autostatus: "📡",
+    autotyping: "⌨️",
+    autorecording: "🎙️",
+    autoreply: "💬",
+    autoreact: "❤️",
+    autofeatures: "⚙️",
+    autoview: "👁️",
+    antilink: "🔒",
+    antidelete: "🗑️",
+    ytmp3: "🎵",
+    ytmp4: "🎬",
+    song: "🎵",
+    play: "▶️",
+    video: "🎥",
+    instagram: "📸",
+    apk: "📱",
+    group: "⚙️",
+    groupinfo: "ℹ️",
+    add: "➕",
+    kick: "🚫",
+    promote: "⬆️",
+    demote: "⬇️",
+    tagall: "📣",
+    hidetag: "🫥",
+    goodbye: "👋",
+    gpt: "🧠",
+    ai: "🤖",
+    gemini: "♊",
+    explain: "💡",
+    imagine: "🎨",
+    choose: "🎯",
+    flip: "🪙",
+    "8ball": "🔮",
+    search: "🔎",
+    image: "🖼️",
+    google: "🌐",
+    upload: "📤",
+    tourl: "🔗",
+    getfile: "📁"
+};
+
+function getCommandEmoji(commandName) {
+    return commandEmojis[String(commandName || "").toLowerCase()] || "🔹";
+}
+
+
+/* ==========================================
    GET COMMAND LOADER
 ========================================== */
 
@@ -200,7 +257,7 @@ function buildMainMenu(
 ) {
 
     return `╔══════════════════════╗
-║   🤖 DRIP QUEEN MD.      ║
+║   🤖 DRIP QUEEN MD   ║
 ╚══════════════════════╝
 
 Hello ${userName} 👋
@@ -223,8 +280,9 @@ Hello ${userName} 👋
 Reply with a number to open a menu.
 
 Example:
-Reply with 1 for General
-Reply with 2 for Download 
+Reply with 1 for general Menu
+Reply with 2 for download Menu
+Reply with 3 for group Menu
 
 Prefix: ${prefix}
 
@@ -278,23 +336,13 @@ function buildCategoryMenu(
 
         commands.forEach(
 
-            (command, index) => {
+            (command) => {
 
-                const number =
-                    index + 1;
-
-
-                const description =
-                    command.description ||
-                    "No description available";
-
+                const emoji =
+                    getCommandEmoji(command.name);
 
                 commandText +=
-                    `│ ${number}. ${prefix}${command.name}\n`;
-
-
-                commandText +=
-                    `│    ${description}\n`;
+                    `│ ${emoji} ${prefix}${command.name}\n`;
 
             }
 
@@ -316,15 +364,10 @@ ${commandText}│
 
 Total Commands: ${commands.length}
 
-Use commands with:
-${prefix}command
-
-Example:
-${prefix}${commands[0]?.name || "menu"}
-
 Type ${prefix}menu to return to the main menu.
 
-Powered by ${config.BOT_NAME}
+> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 `;
 
 }
@@ -478,12 +521,6 @@ module.exports = {
                 );
 
 
-            const chatId = msg?.key?.remoteJid;
-            if (chatId) {
-                const { updateMenuSession } = require("../../src/menuSession");
-                updateMenuSession(chatId, { selectedCategory });
-            }
-
             return await sendMenu(
 
                 sock,
@@ -517,6 +554,7 @@ module.exports = {
         const chatId = msg?.key?.remoteJid;
         if (chatId) {
             createMenuSession(chatId, {
+                type: "main-menu",
                 categories: [
                     "general",
                     "download",

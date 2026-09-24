@@ -89,7 +89,7 @@ module.exports = {
 🤖 More Auto Features coming soon!
 
 > ${config.BOT_NAME}
-> Created by ${config.CREATOR}
+> > Powered by ${config.CREATOR}
 `);
 
         } catch (error) {
