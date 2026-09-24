@@ -48,9 +48,9 @@ module.exports = {
             // Check if the user asked a question
             if (!text || !text.trim()) {
                 return await reply(`
-╔══════════════════════════╗
+╔══════════════════════════════╗
 ║       🔮 MAGIC 8-BALL        ║
-╚══════════════════════════╝
+╚══════════════════════════════╝
 
 Ask me a question!
 
@@ -72,9 +72,9 @@ ${config.PREFIX}8ball Will I be successful?
             await react("🔮");
 
             await reply(`
-╔══════════════════════════╗
+╔══════════════════════════════╗
 ║       🔮 MAGIC 8-BALL        ║
-╚══════════════════════════╝
+╚══════════════════════════════╝
 
 ╭─〔 YOUR QUESTION 〕
 │
