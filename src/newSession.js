@@ -48,6 +48,7 @@ async function loadBaileys() {
             fetchLatestWaWebVersion,
             makeCacheableSignalKeyStore,
             Browsers,
+            jidNormalizedUser,
             areJidsSameUser
         } = baileysModule);
     }
@@ -2050,7 +2051,108 @@ async function generatePairingCode(phoneNumber) {
     sock.ev.on("creds.update", saveCreds);
     attachSessionHandlers(userId, sock);
 
-    console.log(`[BUILD] Drip Queen MD welcome-v2-audio loaded for ${userId}`);
+    console.log(`[BUILD] Drip Queen MD pairing-v2 + welcome-v2-audio loaded for ${userId}`);
+
+    /*
+       IMPORTANT: keep a persistent connection.update listener on the
+       temporary pairing socket. The old V17 build only listened long enough
+       to request the pairing code. After WhatsApp accepted the code, there
+       was no persistent listener to promote the socket to an authenticated
+       session or reconnect it after WhatsApp's restartRequired transition.
+    */
+    sock.ev.on("connection.update", async update => {
+        const { connection, lastDisconnect } = update || {};
+
+        if (connection === "connecting") {
+            console.log(`[PAIRING CONNECTING] ${userId}`);
+            return;
+        }
+
+        if (connection === "open") {
+            connectingSessions.delete(userId);
+            pairingRequests.delete(userId);
+            clearReconnectTimer(userId);
+
+            activeSessions.set(userId, sock);
+            registerSession(userId, sock);
+
+            console.log(`[PAIRING CONNECTED] ${userId}`);
+
+            // Give WhatsApp a short moment to finish account initialization
+            // before sending the welcome card/audio.
+            scheduleWelcomeMessage(userId, sock);
+            return;
+        }
+
+        if (connection === "close") {
+            connectingSessions.delete(userId);
+            activeSessions.delete(userId);
+
+            const statusCode =
+                lastDisconnect?.error?.output?.statusCode;
+
+            console.log(
+                `[PAIRING CLOSED] ${userId}: statusCode=${statusCode || "unknown"}`
+            );
+
+            if (statusCode === DisconnectReason.loggedOut) {
+                pairingRequests.delete(userId);
+                clearReconnectTimer(userId);
+
+                const loggedOutPath = path.join(
+                    config.SESSIONS_PATH,
+                    userId
+                );
+
+                try {
+                    if (fs.existsSync(loggedOutPath)) {
+                        fs.rmSync(loggedOutPath, {
+                            recursive: true,
+                            force: true
+                        });
+                    }
+                } catch (cleanupError) {
+                    console.error(
+                        `[PAIRING CLEANUP ERROR] ${userId}:`,
+                        cleanupError.message
+                    );
+                }
+
+                return;
+            }
+
+            // WhatsApp commonly closes the initial pairing socket with
+            // restartRequired (515) after the phone accepts the code. The
+            // credentials are saved by creds.update, so rebuild the normal
+            // authenticated session from disk.
+            if (config.AUTO_RECONNECT && !reconnectTimers.has(userId)) {
+                const delay =
+                    statusCode === DisconnectReason.restartRequired
+                        ? 1000
+                        : (Number(config.RECONNECT_DELAY) || 5000);
+
+                console.log(
+                    `[PAIRING RECONNECT] ${userId} in ${delay}ms`
+                );
+
+                const timer = setTimeout(async () => {
+                    reconnectTimers.delete(userId);
+                    pairingRequests.delete(userId);
+
+                    try {
+                        await connectSession(userId);
+                    } catch (error) {
+                        console.error(
+                            `[PAIRING RECONNECT ERROR] ${userId}:`,
+                            error.stack || error.message
+                        );
+                    }
+                }, delay);
+
+                reconnectTimers.set(userId, timer);
+            }
+        }
+    });
 
     // Baileys may need a short moment to initialize on slower hosts.
     // Retry a few times instead of returning a false pairing failure.
