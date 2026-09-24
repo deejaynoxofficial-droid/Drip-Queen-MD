@@ -146,7 +146,8 @@ const commandEmojis = {
     google: "🌐",
     upload: "📤",
     tourl: "🔗",
-    getfile: "📁"
+    getfile: "📁",
+    settings: "⚙️"
 };
 
 function getCommandEmoji(commandName) {
