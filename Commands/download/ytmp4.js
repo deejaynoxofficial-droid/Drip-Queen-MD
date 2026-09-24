@@ -41,7 +41,7 @@ module.exports = {
 
             const result = await getDownload(query, "video");
             const file = await downloadBuffer(result.url);
-            const caption = `🎬 *${result.title}*\n\n🤖 ${config.BOT_NAME}`;
+            const caption = `🎬 *${result.title}*\n\n> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`;
 
             return await sock.sendMessage(chatId, {
                 video: file.buffer,

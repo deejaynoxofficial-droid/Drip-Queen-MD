@@ -41,7 +41,7 @@ module.exports = {
 
             const result = await getDownload(query, "audio");
             const file = await downloadBuffer(result.url);
-            const caption = `🎬 *${result.title}*\n\n🤖 ${config.BOT_NAME}`;
+            const caption = `🎬 *${result.title}*\n\n> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`;
 
             return await sock.sendMessage(chatId, {
                 audio: file.buffer,
