@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const config = require("../../config");
+const { createMenuSession, removeMenuSession } = require("../../src/menuSession");
 
 
 /* ==========================================
@@ -198,9 +199,9 @@ function buildMainMenu(
     prefix
 ) {
 
-    return `╔═══════════════════╗
+    return `╔══════════════════════╗
 ║   🤖 DRIP QUEEN MD   ║
-╚═══════════════════╝
+╚══════════════════════╝
 
 Hello ${userName} 👋
 
@@ -477,6 +478,12 @@ module.exports = {
                 );
 
 
+            const chatId = msg?.key?.remoteJid;
+            if (chatId) {
+                const { updateMenuSession } = require("../../src/menuSession");
+                updateMenuSession(chatId, { selectedCategory });
+            }
+
             return await sendMenu(
 
                 sock,
@@ -505,6 +512,26 @@ module.exports = {
 
             );
 
+        // Store the category order shown in the main menu so a plain
+        // numeric reply (1-10) can be resolved on the next message.
+        const chatId = msg?.key?.remoteJid;
+        if (chatId) {
+            createMenuSession(chatId, {
+                categories: [
+                    "general",
+                    "download",
+                    "group",
+                    "owner",
+                    "channel",
+                    "ai",
+                    "fun",
+                    "tools",
+                    "search",
+                    "upload"
+                ],
+                selectedCategory: null
+            });
+        }
 
         return await sendMenu(
 
