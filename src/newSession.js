@@ -59,6 +59,14 @@ const pino = require("pino");
 
 const config = require("../config");
 
+// Numeric menu reply sessions (e.g. reply "1" after .menu)
+let menuSessionStore = null;
+try {
+    menuSessionStore = require("./menuSession");
+} catch (error) {
+    console.warn("[MENU] menuSession module unavailable:", error.message);
+}
+
 
 /* ==========================================
    ACTIVE SESSIONS
@@ -228,7 +236,7 @@ async function sendWelcomeMessage(userId, sock) {
             "there"
         ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot1.png");
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
@@ -237,26 +245,25 @@ async function sendWelcomeMessage(userId, sock) {
 
         console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
 ┃        👑 DRIP QUEEN MD      ┃
-┃                              
+┃                              ┃
 ┃      ✨ Welcome, ${displayName}!
-┃                              
-┃   🤖 Your WhatsApp bot is   
-┃      now connected.          
-┃                              
-┃   ⚡ Mode    : Public        
-┃   🔹 Prefix  : ${prefix}             
-┃   📦 Version : 1             
-┃                              
-┃   💎 Type ${prefix}menu to explore 
-┃                              
-┃   📢 Official Channel        
+┃                              ┃
+┃   🤖 Your WhatsApp bot is   ┃
+┃      now connected.          ┃
+┃                              ┃
+┃   ⚡ Mode    : Public        ┃
+┃   🔹 Prefix  : ${prefix}             ┃
+┃   📦 Version : 1             ┃
+┃                              ┃
+┃   💎 Type ${prefix}menu to explore ┃
+┃                              ┃
+┃   📢 Official Channel        ┃
 ┃   ${channel}
-┃                              
-┃       > ${config.BOT_NAME}
-> Powered by ${config.CREATOR}    
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+┃                              ┃
+┃       👑 ${creatorNames}      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
         const addTarget = value => {
@@ -1015,14 +1022,25 @@ async function handleMessages(
 
             if (text) {
 
-                await handleCommand(
+                // A numeric reply belongs to an active .menu session.
+                // Handle it before normal command parsing because "1" has
+                // no command prefix.
+                const handledMenuReply =
+                    await handleNumericMenuReply(
+                        sock,
+                        userId,
+                        msg,
+                        text
+                    );
 
-                    sock,
-                    userId,
-                    msg,
-                    text
-
-                );
+                if (!handledMenuReply) {
+                    await handleCommand(
+                        sock,
+                        userId,
+                        msg,
+                        text
+                    );
+                }
 
             }
 
@@ -1099,6 +1117,131 @@ function getMessageText(msg) {
     return "";
 }
 
+
+/* ==========================================
+   HANDLE NUMERIC MENU REPLIES
+========================================== */
+
+async function handleNumericMenuReply(sock, userId, msg, text) {
+    try {
+        if (!menuSessionStore) return false;
+
+        const value = String(text || "").trim();
+        if (!/^\d{1,2}$/.test(value)) return false;
+
+        const chatId = msg?.key?.remoteJid;
+        if (!chatId) return false;
+
+        // Menu sessions are stored by chat JID, which is stable for both
+        // normal chats and the linked account's self-chat/LID chat.
+        const session = menuSessionStore.getMenuSession(chatId);
+        if (!session) return false;
+
+        const number = Number(value);
+        const categories = Array.isArray(session.categories)
+            ? session.categories
+            : [];
+
+        if (number < 1 || number > categories.length) {
+            await sock.sendMessage(chatId, {
+                text: `❌ Invalid menu number. Please reply with 1-${categories.length}.`
+            }, { quoted: msg });
+            return true;
+        }
+
+        const selectedCategory = String(categories[number - 1]);
+
+        // Refresh the menu session so repeated selections remain usable.
+        menuSessionStore.updateMenuSession(chatId, {
+            selectedCategory
+        });
+
+        const menuCommand = await findCommand("menu");
+        if (!menuCommand) {
+            throw new Error("Menu command is not loaded");
+        }
+
+        const isFromMe = Boolean(msg.key?.fromMe);
+        const sender = isFromMe
+            ? (sock.user?.id || sock.user?.lid || msg.key?.participant || chatId || userId)
+            : (msg.key?.participant || chatId || userId);
+
+        const context = {
+            sock,
+            conn: sock,
+            client: sock,
+            wa: sock,
+            msg,
+            message: msg,
+            m: msg,
+            args: [String(number)],
+            text: value,
+            body: value,
+            commandName: "menu",
+            command: menuCommand.name,
+            prefix: config.PREFIX || ".",
+            prefixes: Array.isArray(config.PREFIXES) ? config.PREFIXES : [config.PREFIX || "."],
+            sender,
+            senderJid: isFromMe ? (msg.key?.participant || chatId || sender) : sender,
+            from: chatId,
+            chat: chatId,
+            chatId,
+            jid: chatId,
+            userId,
+            pushName: msg.pushName || msg.key?.pushName || "User",
+            isGroup: chatId.endsWith("@g.us"),
+            isFromMe,
+            isOwner: isFromMe,
+            selectedCategory,
+            menuSession: session,
+            quoted: msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || null,
+            quotedMessage: msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || null,
+            reply: async (message, options = {}) => {
+                const content = typeof message === "string" ? { text: message } : message;
+                return sock.sendMessage(chatId, content, { quoted: msg, ...options });
+            },
+            sendMessage: async (content, options = {}) => {
+                return sock.sendMessage(chatId, content, { quoted: msg, ...options });
+            },
+            sendText: async message => {
+                return sock.sendMessage(chatId, { text: String(message) }, { quoted: msg });
+            },
+            react: async emoji => sock.sendMessage(chatId, {
+                react: { text: String(emoji), key: msg.key }
+            }),
+            sendReaction: async emoji => sock.sendMessage(chatId, {
+                react: { text: String(emoji), key: msg.key }
+            })
+        };
+
+        console.log(`[MENU REPLY] ${userId} chat=${chatId} number=${number} -> ${selectedCategory}`);
+
+        if (typeof menuCommand.execute === "function") {
+            await menuCommand.execute(context);
+        } else if (typeof menuCommand.run === "function") {
+            await menuCommand.run(context);
+        } else if (typeof menuCommand.handler === "function") {
+            await menuCommand.handler(context);
+        } else {
+            throw new Error("Menu command has no execution function");
+        }
+
+        return true;
+    } catch (error) {
+        console.error("[MENU REPLY ERROR]", error.stack || error.message);
+        try {
+            const chatId = msg?.key?.remoteJid;
+            if (chatId) {
+                await sock.sendMessage(chatId, {
+                    text: `❌ Menu error: ${error.message}`
+                }, { quoted: msg });
+            }
+        } catch (replyError) {
+            console.error("[MENU REPLY ERROR SEND FAILED]", replyError.message);
+        }
+        return true;
+    }
+}
 
 /* ==========================================
    HANDLE COMMANDS
