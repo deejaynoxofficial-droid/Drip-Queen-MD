@@ -178,10 +178,9 @@ function getWelcomeMarkerPath(userId) {
 
 async function sendWelcomeMessage(userId, sock) {
 
-    const WELCOME_VERSION = "welcome-v2";
+    const WELCOME_VERSION = "welcome-v1-audio";
 
     try {
-
         if (!sock?.user?.id) {
             console.warn(`[WELCOME] No bot JID available for ${userId}`);
             return false;
@@ -189,88 +188,125 @@ async function sendWelcomeMessage(userId, sock) {
 
         const markerPath = getWelcomeMarkerPath(userId);
         let marker = null;
-
         try {
             if (fs.existsSync(markerPath)) {
                 marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
             }
         } catch {}
 
-        // Do not resend the same welcome forever, but allow this redesigned
-        // welcome card to appear once for existing sessions.
         if (marker?.version === WELCOME_VERSION) {
+            console.log(`[WELCOME] Already sent for ${userId}`);
             return false;
         }
 
         const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
         const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
         const prefix = config.PREFIX || ".";
+        const displayName = String(
+            sock.user?.name ||
+            sock.user?.verifiedName ||
+            userId ||
+            "there"
+        ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
         const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
-┃ ✨ Welcome, @user
-┃
-┃ 🤖 Bot   : DRIP QUEEN MD
-┃ ⚡ Mode  : Public
-┃ 🔹 Prefix: ${prefix}
-┃
-┃ 💎 Type ${prefix}menu to explore
-┃ 📢 Channel:
-┃ ${channel}
-┃
-┃ 👑 NOX STAR.B
-┃ 🛠️ NOX STAR TECH
-╰━━━━━━━━━━━━━━━━━╯`;
+        const audioPath = path.join(config.ROOT_DIR, "assets", "audio", "welcome.ogg");
 
-        let target = sock.user.id;
-        try {
-            if (typeof jidNormalizedUser === "function") {
-                target = jidNormalizedUser(sock.user.id);
-            }
-        } catch {}
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 DRIP QUEEN MD      ┃
+┃                              ┃
+┃      ✨ Welcome, ${displayName}!
+┃                              ┃
+┃   🤖 Your WhatsApp bot is   ┃
+┃      now connected.          ┃
+┃                              ┃
+┃   ⚡ Mode    : Public        ┃
+┃   🔹 Prefix  : ${prefix}             ┃
+┃   📦 Version : 1             ┃
+┃                              ┃
+┃   💎 Type ${prefix}menu to explore ┃
+┃                              ┃
+┃   📢 Official Channel        ┃
+┃   ${channel}
+┃                              ┃
+┃       👑 ${creatorNames}      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+
+        const targets = [];
+        const addTarget = value => {
+            if (!value || typeof value !== "string") return;
+            try {
+                const normalized = jidNormalizedUser(value);
+                if (normalized && !targets.includes(normalized)) targets.push(normalized);
+            } catch {}
+            if (!targets.includes(value)) targets.push(value);
+        };
+
+        addTarget(sock.user.id);
+        addTarget(sock.user.lid);
+
+        const phone = String(userId || "").replace(/\D/g, "");
+        if (phone) addTarget(`${phone}@s.whatsapp.net`);
+
+        await new Promise(resolve => setTimeout(resolve, 1800));
 
         let sent = false;
+        let lastError = null;
 
-        // Wait briefly after connection open so the paired account is ready
-        // to accept an outbound message.
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+            for (const target of targets) {
+                try {
+                    if (fs.existsSync(imagePath)) {
+                        await sock.sendMessage(target, {
+                            image: fs.readFileSync(imagePath),
+                            caption
+                        });
+                    } else {
+                        await sock.sendMessage(target, { text: caption });
+                    }
 
-        if (fs.existsSync(imagePath)) {
-            try {
-                await sock.sendMessage(target, {
-                    image: fs.readFileSync(imagePath),
-                    caption
-                });
-                sent = true;
-                console.log(`[WELCOME] Image welcome card sent to ${userId}`);
-            } catch (imageError) {
-                console.warn(`[WELCOME] Image send failed for ${userId}: ${imageError.message}`);
+                    // Send a separate voice/audio welcome immediately after the text/image card.
+                    if (fs.existsSync(audioPath)) {
+                        await sock.sendMessage(target, {
+                            audio: fs.readFileSync(audioPath),
+                            mimetype: "audio/ogg; codecs=opus",
+                            ptt: false
+                        });
+                        console.log(`[WELCOME AUDIO] Sent successfully to ${target} for ${userId}`);
+                    } else {
+                        console.warn(`[WELCOME AUDIO] Missing file: ${audioPath}`);
+                    }
+
+                    sent = true;
+                    console.log(`[WELCOME] Sent successfully to ${target} for ${userId}`);
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`[WELCOME] Send failed to ${target} (attempt ${attempt}): ${error.message}`);
+                }
             }
-        } else {
-            console.warn(`[WELCOME] Image not found at ${imagePath}`);
+
+            if (!sent && attempt < 3) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
         }
 
-        // Always have a working fallback if image delivery fails.
         if (!sent) {
-            await sock.sendMessage(target, { text: caption });
-            sent = true;
-            console.log(`[WELCOME] Text welcome sent to ${userId}`);
+            throw lastError || new Error("Unable to deliver welcome message to paired account.");
         }
 
-        if (sent) {
-            fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-            fs.writeFileSync(markerPath, JSON.stringify({
-                sentAt: new Date().toISOString(),
-                version: WELCOME_VERSION,
-                botVersion: config.BOT_VERSION || "1.0.0"
-            }, null, 2), "utf8");
-        }
+        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+        fs.writeFileSync(markerPath, JSON.stringify({
+            sentAt: new Date().toISOString(),
+            version: WELCOME_VERSION,
+            botVersion: "1.0.0"
+        }, null, 2), "utf8");
 
-        return sent;
+        return true;
 
     } catch (error) {
         console.error(`[WELCOME ERROR] ${userId}:`, error.stack || error.message);
