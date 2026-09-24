@@ -228,7 +228,7 @@ async function sendWelcomeMessage(userId, sock) {
             "there"
         ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot1.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
@@ -239,23 +239,23 @@ async function sendWelcomeMessage(userId, sock) {
 
         const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
 ┃        👑 DRIP QUEEN MD      ┃
-┃                              ┃
+┃                              
 ┃      ✨ Welcome, ${displayName}!
-┃                              ┃
-┃   🤖 Your WhatsApp bot is   ┃
-┃      now connected.          ┃
-┃                              ┃
-┃   ⚡ Mode    : Public        ┃
-┃   🔹 Prefix  : ${prefix}             ┃
-┃   📦 Version : 1             ┃
-┃                              ┃
-┃   💎 Type ${prefix}menu to explore ┃
-┃                              ┃
-┃   📢 Official Channel        ┃
+┃                              
+┃   🤖 Your WhatsApp bot is   
+┃      now connected.          
+┃                              
+┃   ⚡ Mode    : Public        
+┃   🔹 Prefix  : ${prefix}             
+┃   📦 Version : 1             
+┃                              
+┃   💎 Type ${prefix}menu to explore 
+┃                              
+┃   📢 Official Channel        
 ┃   ${channel}
-┃                              ┃
-┃       > 👑${config.BOT_NAME}
-> Powered by ${config.CREATOR}    ┃
+┃                              
+┃       > ${config.BOT_NAME}
+> Powered by ${config.CREATOR}    
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
