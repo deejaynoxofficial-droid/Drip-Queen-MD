@@ -43,6 +43,15 @@ const FEATURE_LABELS = {
     autoView: "👁️ Auto View"
 };
 
+const PROTECTION_COMMANDS = {
+    antispam: "🛡️ Anti Spam",
+    antiflood: "🌊 Anti Flood",
+    antibot: "🤖 Anti Bot",
+    antimention: "🔕 Anti Mention",
+    antitag: "🏷️ Anti Tag",
+    antinsfw: "🔞 Anti NSFW"
+};
+
 const FEATURE_ALIASES = {
     read: "autoRead",
     autoread: "autoRead",
@@ -114,6 +123,10 @@ function renderSettings() {
 
     const featureLines = Object.keys(DEFAULT_SETTINGS)
         .map(key => `│ ${FEATURE_LABELS[key] || key} : ${status(auto[key])}`)
+        .join("\n");
+
+    const protectionLines = Object.entries(PROTECTION_COMMANDS)
+        .map(([key, label]) => `│ ${label} → ${config.PREFIX}${key} on|off`)
         .join("\n");
 
     return `╔══════════════════════════════╗
@@ -202,7 +215,11 @@ function renderHelp() {
         Object.entries(FEATURE_LABELS)
             .map(([key, label]) => `• ${label} → ${config.PREFIX}settings ${key} on|off`)
             .join("\n") +
-        `\n\n💡 ${config.PREFIX}settings <feature} also toggles the current state.`.replace("<feature}", "<feature>") +
+        `\n\nGROUP PROTECTION\n` +
+        Object.entries(PROTECTION_COMMANDS)
+            .map(([key, label]) => `• ${label} → ${config.PREFIX}${key} on|off`)
+            .join("\n") +
+        `\n\n💡 Protection switches are group-specific and are changed with their own commands.` +
         `\n\n🔄 ${config.PREFIX}settings reset\n\n${footer()}`;
 }
 
@@ -210,7 +227,7 @@ module.exports = {
     name: "settings",
     aliases: ["setting", "config", "botsettings"],
     category: "Owner",
-    description: "View and manage editable bot configuration and automatic features.",
+    description: "View and manage bot configuration, automatic features, and group-protection controls.",
     usage: `${config.PREFIX}settings`,
 
     execute: async (context) => {
@@ -229,6 +246,19 @@ module.exports = {
             }
 
             if (action === "help") return reply(renderHelp());
+
+            if (["protection", "protections", "security"].includes(action)) {
+                const lines = Object.entries(PROTECTION_COMMANDS)
+                    .map(([key, label]) => `• ${label} → ${config.PREFIX}${key} on|off`)
+                    .join("\n");
+
+                return reply(
+                    `🛡️ *GROUP PROTECTION COMMANDS*\n\n` +
+                    `${lines}\n\n` +
+                    `These settings are stored per group and are controlled by the protection commands.\n\n` +
+                    footer()
+                );
+            }
 
             if (action === "prefix") {
                 const value = String(args[1] || "").trim();
