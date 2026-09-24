@@ -322,8 +322,8 @@ module.exports = {
 │
 │ ${title}
 │
-│ Powered by:
-│ ${config.BOT_NAME}
+> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 │
 ╰───────────────`
 
