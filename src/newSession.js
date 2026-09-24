@@ -237,7 +237,7 @@ async function sendWelcomeMessage(userId, sock) {
 
         console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
 ┃        👑 DRIP QUEEN MD      ┃
 ┃                              ┃
 ┃      ✨ Welcome, ${displayName}!
@@ -254,8 +254,9 @@ async function sendWelcomeMessage(userId, sock) {
 ┃   📢 Official Channel        ┃
 ┃   ${channel}
 ┃                              ┃
-┃       👑 ${creatorNames}      ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+┃       > 👑${config.BOT_NAME}
+> Powered by ${config.CREATOR}    ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
         const addTarget = value => {
