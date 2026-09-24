@@ -424,7 +424,7 @@ module.exports = {
 │ ${uploadedUrl}
 │
 ╰───────────────
-🤖 ${config.BOT_NAME}`
+> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`
 
                 },
 
