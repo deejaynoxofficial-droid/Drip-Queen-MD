@@ -211,8 +211,8 @@ async function sendWelcomeMessage(userId, sock) {
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
 
-        const caption = `╭━〔 👑 DRIP QUEEN MD 〕━╮
-┃ ✨ Welcome, 🤗🤗🤗
+        const caption = `╭━━━〔 👑 DRIP QUEEN MD 〕━━━╮
+┃ ✨ Welcome, @user
 ┃
 ┃ 🤖 Bot   : DRIP QUEEN MD
 ┃ ⚡ Mode  : Public
@@ -222,8 +222,8 @@ async function sendWelcomeMessage(userId, sock) {
 ┃ 📢 Channel:
 ┃ ${channel}
 ┃
-┃ > ${config.BOT_NAME}
-> Powered by ${config.CREATOR}
+┃ 👑 NOX STAR.B
+┃ 🛠️ NOX STAR TECH
 ╰━━━━━━━━━━━━━━━━━╯`;
 
         let target = sock.user.id;
@@ -880,85 +880,35 @@ async function handleMessages(
             /*
                FROM-ME / SELF-MESSAGE SUPPORT
                --------------------------------
-               Baileys can expose the linked account's own messages with
-               key.fromMe=true. Older code compared only the phone-number
-               JID, which fails when WhatsApp uses a LID for the self chat.
+               A command typed by the linked WhatsApp account is a legitimate
+               command source. Older builds tried to prove that a fromMe
+               message was the bot's self-chat by resolving LID <-> phone JIDs.
+               That extra gate is fragile because WhatsApp can expose a self
+               message as @lid, @s.whatsapp.net, or with an alternate JID.
 
-               We explicitly support both the account JID and account LID,
-               and use Baileys' JID comparison helper when available.
-               By default, only the bot's own self-chat is processed. This
-               prevents the bot from executing its own outgoing command text
-               in normal chats and creating command loops.
+               IMPORTANT: Baileys already marks the message with key.fromMe.
+               For command processing we trust that flag and do not reject the
+               command merely because a LID mapping is temporarily unavailable.
+               This fixes the case where other users can run commands but the
+               paired account itself is silently ignored.
             */
-            if (msg.key?.fromMe) {
-                const remoteJid = String(msg.key?.remoteJid || "").trim();
-                const remoteJidAlt = String(msg.key?.remoteJidAlt || "").trim();
+            const isFromMeMessage = Boolean(msg.key?.fromMe);
 
-                /*
-                   WhatsApp self-chat can now arrive as an @lid JID while the
-                   authenticated account is exposed as @s.whatsapp.net.
-                   Comparing the raw JIDs (or even areJidsSameUser()) is not
-                   enough because the LID number and phone number are different
-                   identifiers. Resolve both directions through Baileys' LID
-                   mapping when it is available.
-                */
-                const candidates = [
-                    remoteJid,
-                    remoteJidAlt,
-                    msg.key?.participant,
-                    msg.key?.participantAlt
-                ].filter(Boolean).map(String);
-
-                const ownJids = [
-                    sock.user?.id,
-                    sock.user?.lid
-                ].filter(Boolean).map(String);
-
-                try {
-                    const pn = String(sock.user?.id || "").trim();
-                    const lidMapping = sock.signalRepository?.lidMapping;
-
-                    if (lidMapping && pn) {
-                        const mappedLid = await lidMapping.getLIDForPN(pn);
-                        if (mappedLid) ownJids.push(String(mappedLid));
-                    }
-
-                    for (const candidate of [...candidates]) {
-                        if (candidate.endsWith("@lid") && lidMapping?.getPNForLID) {
-                            const mappedPn = await lidMapping.getPNForLID(candidate);
-                            if (mappedPn) candidates.push(String(mappedPn));
-                        }
-                    }
-                } catch (mappingError) {
-                    console.warn(`[FROM-ME LID MAP] ${userId}: ${mappingError.message}`);
-                }
-
-                const normalize = value =>
-                    String(value || "").replace(/:.*(?=@)/, "").trim();
-
-                const selfChat = candidates.some(candidate =>
-                    ownJids.some(ownJid => {
-                        const a = normalize(candidate);
-                        const b = normalize(ownJid);
-                        if (a === b) return true;
-
-                        try {
-                            return typeof areJidsSameUser === "function" && areJidsSameUser(a, b);
-                        } catch {
-                            return false;
-                        }
-                    })
-                );
-
+            if (isFromMeMessage) {
                 const allowFromMe = config.PROCESS_FROM_ME !== false;
-                const allowFromMeEverywhere = config.PROCESS_FROM_ME_IN_ALL_CHATS === true;
 
-                if (!allowFromMe || (!selfChat && !allowFromMeEverywhere)) {
-                    console.log(`[FROM-ME IGNORED] ${userId} remote=${remoteJid} alt=${remoteJidAlt || "-"} selfChat=${selfChat}`);
+                if (!allowFromMe) {
+                    console.log(`[FROM-ME IGNORED] ${userId} PROCESS_FROM_ME=false`);
                     continue;
                 }
 
-                console.log(`[FROM-ME ACCEPTED] ${userId} remote=${remoteJid} alt=${remoteJidAlt || "-"} selfChat=${selfChat}`);
+                const remoteJid = String(msg.key?.remoteJid || "").trim();
+                const remoteJidAlt = String(msg.key?.remoteJidAlt || "").trim();
+
+                console.log(
+                    `[FROM-ME ACCEPTED] ${userId} remote=${remoteJid || "-"} alt=${remoteJidAlt || "-"} ` +
+                    `own=${sock.user?.id || "-"} ownLid=${sock.user?.lid || "-"}`
+                );
             }
 
 
@@ -994,13 +944,13 @@ async function handleMessages(
             );
 
 
-            await handleAutoFeatures(
-
-                sock,
-                msg,
-                text
-
-            );
+            if (!msg.key?.fromMe) {
+                await handleAutoFeatures(
+                    sock,
+                    msg,
+                    text
+                );
+            }
 
 
             if (text) {
