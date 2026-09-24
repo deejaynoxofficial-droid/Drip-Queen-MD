@@ -262,7 +262,8 @@ async function sendWelcomeMessage(userId, sock) {
 ┃   📢 Official Channel        
 ┃   ${channel}
 ┃                              
-┃       👑 
+┃       👑> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
