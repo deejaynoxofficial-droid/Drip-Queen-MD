@@ -4,14 +4,12 @@
   "botName": "DRIP QUEEN MD",
   "creator": "NOX STAR TECH",
   "createdAt": "2026-01-01T00:00:00.000Z",
-
   "features": {
     "autoRead": false,
     "autoTyping": false,
     "autoRecording": false,
     "alwaysOnline": false,
     "autoReact": false,
-
     "autoReply": false,
     "autoStatusView": false,
     "antiDelete": false,
