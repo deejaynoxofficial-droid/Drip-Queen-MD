@@ -1,235 +1,65 @@
 const config = require("../../config");
-
-
-/* ==========================================
-   VIDEO COMMAND
-========================================== */
+const { getDownload, downloadBuffer } = require("../../lib/ytApi");
 
 module.exports = {
-
-    name:
-        "video",
-
-
-    aliases: [
-
-        "vid",
-        "mp4",
-        "video"
-
-    ],
-
-
-    category:
-        "Download",
-
-
-    description:
-        "Search and download a video using a query",
-
-
-    usage:
-        ".video <video name>",
-
+    name: "video",
+    aliases: ["vid", "mp4", "video"],
+    category: "Download",
+    description: "Search and download a video using YT-API",
+    usage: ".video <video name>",
 
     async execute(context) {
-
-        const {
-
-            sock,
-            msg,
-            args,
-            prefix
-
-        } = context;
-
-
-        const chatId =
-            msg.key.remoteJid;
-
-
-        /* ==========================================
-           GET SEARCH QUERY
-        ========================================== */
-
-        const query =
-            args.join(" ").trim();
-
-
-        /* ==========================================
-           VALIDATE QUERY
-        ========================================== */
+        const { sock, msg, args, prefix } = context;
+        const chatId = msg.key.remoteJid;
+        const query = args.join(" ").trim();
 
         if (!query) {
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 🎬 VIDEO DOWNLOADER 〕
+            return await sock.sendMessage(chatId, {
+                text: `╭─〔 🎬 YOUTUBE MP4 〕
 │
-│ Please enter a video name.
+│ Please enter a song or video name.
 │
 │ Example:
 │ ${prefix}video Burna Boy City Boys
 │
-│ More examples:
-│ ${prefix}video Wizkid Essence
-│ ${prefix}video Funny Cat Videos
-│
 ╰───────────────`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
+            }, { quoted: msg });
         }
 
-
         try {
-
-            /* ==========================================
-               SEARCHING UI
-            ========================================== */
-
-            await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 🎬 VIDEO SEARCH 〕
+            await sock.sendMessage(chatId, {
+                text: `╭─〔 🎬 YOUTUBE MP4 〕
 │
-│ 🔎 Searching:
+│ 🔎 Searching YouTube...
+│
 │ ${query}
 │
-│ ⏳ Please wait...
+│ ⏳ Downloading...
 │
 ╰───────────────`
+            }, { quoted: msg });
 
-                },
+            const result = await getDownload(query, "video");
+            const file = await downloadBuffer(result.url);
+            const caption = `🎬 *${result.title}*\n\n🤖 ${config.BOT_NAME}`;
 
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
-
-            /*
-               ==========================================
-
-               VIDEO DOWNLOAD FLOW
-
-               Query
-                 ↓
-               Search API
-                 ↓
-               Find matching video
-                 ↓
-               Request MP4 download
-                 ↓
-               Download video
-                 ↓
-               Send to WhatsApp
-
-               ==========================================
-
-               API integration will be added later.
-            */
-
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 🎬 VIDEO RESULT 〕
-│
-│ 🔎 Query:
-│ ${query}
-│
-│ ⚙️ Video engine initialized.
-│
-│ ⏳ Preparing video service...
-│
-╰───────────────
-
-🤖 ${config.BOT_NAME}`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
-
+            return await sock.sendMessage(chatId, {
+                video: file.buffer,
+                mimetype: result.mimeType || "video/mp4",
+                fileName: `${String(result.title).replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "download"}.mp4`,
+                caption
+            }, { quoted: msg });
         } catch (error) {
-
-            console.error(
-
-                "[VIDEO COMMAND ERROR]",
-
-                error.message
-
-            );
-
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 ❌ VIDEO ERROR 〕
-│
-│ Unable to process your request.
+            console.error("[video COMMAND ERROR]", error.message);
+            return await sock.sendMessage(chatId, {
+                text: `╭─〔 ❌ MP4 ERROR 〕
 │
 │ ${error.message}
 │
 │ Please try again later.
 │
 ╰───────────────`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
+            }, { quoted: msg });
         }
-
     }
-
 };

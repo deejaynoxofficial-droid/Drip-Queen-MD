@@ -1,288 +1,65 @@
 const config = require("../../config");
-
-const {
-    hasApiKey,
-    formatFileSize
-} = require("../../lib/downloadApi");
-
-
-/* ==========================================
-   SONG COMMAND
-========================================== */
+const { getDownload, downloadBuffer } = require("../../lib/ytApi");
 
 module.exports = {
-
-    name:
-        "song",
-
-
-    aliases: [
-
-        "music",
-        "audio",
-        "mp3"
-
-    ],
-
-
-    category:
-        "Download",
-
-
-    description:
-        "Search and download a song using a query",
-
-
-    usage:
-        ".song <song name>",
-
+    name: "song",
+    aliases: ["music", "audio", "mp3"],
+    category: "Download",
+    description: "Search and download a song using YT-API",
+    usage: ".song <song name>",
 
     async execute(context) {
-
-        const {
-
-            sock,
-            msg,
-            args,
-            prefix
-
-        } = context;
-
-
-        const chatId =
-            msg.key.remoteJid;
-
-
-        /* ==========================================
-           GET USER QUERY
-        ========================================== */
-
-        const query =
-            args.join(" ").trim();
-
-
-        /* ==========================================
-           VALIDATE QUERY
-        ========================================== */
+        const { sock, msg, args, prefix } = context;
+        const chatId = msg.key.remoteJid;
+        const query = args.join(" ").trim();
 
         if (!query) {
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 🎵 SONG DOWNLOADER 〕
+            return await sock.sendMessage(chatId, {
+                text: `╭─〔 🎵 YOUTUBE MP3 〕
 │
-│ Please enter a song name.
+│ Please enter a song or video name.
 │
 │ Example:
 │ ${prefix}song Burna Boy City Boys
 │
-│ You can also search:
-│ ${prefix}song Wizkid Essence
-│ ${prefix}song Drake God's Plan
-│
 ╰───────────────`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
+            }, { quoted: msg });
         }
-
-
-        /* ==========================================
-           API KEY CHECK
-        ========================================== */
-
-        if (!hasApiKey()) {
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 ⚠️ DOWNLOAD SERVICE 〕
-│
-│ The download API key has not
-│ been configured yet.
-│
-│ Please configure:
-│ DOWNLOAD_API_KEY
-│
-╰───────────────`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
-        }
-
-
-        /* ==========================================
-           SEARCHING MESSAGE
-        ========================================== */
-
-        await sock.sendMessage(
-
-            chatId,
-
-            {
-
-                text:
-
-`╭─〔 🎵 SONG SEARCH 〕
-│
-│ 🔎 Searching:
-│ ${query}
-│
-│ ⏳ Please wait...
-│
-╰───────────────`
-
-            },
-
-            {
-
-                quoted:
-                    msg
-
-            }
-
-        );
-
 
         try {
-
-            /*
-               ======================================
-
-               DOWNLOAD FLOW
-
-               Query
-                 ↓
-               Search API
-                 ↓
-               Get first result
-                 ↓
-               Request audio download
-                 ↓
-               Download file
-                 ↓
-               Send to WhatsApp
-
-               ======================================
-
-
-               API CONNECTION WILL GO HERE.
-
-               The exact code depends on the API
-               provider you are using.
-            */
-
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 🎵 SONG RESULT 〕
+            await sock.sendMessage(chatId, {
+                text: `╭─〔 🎵 YOUTUBE MP3 〕
 │
-│ 🔎 Query:
+│ 🔎 Searching YouTube...
+│
 │ ${query}
 │
-│ ⚙️ Download engine is ready.
+│ ⏳ Downloading...
 │
-│ Maximum file size:
-│ ${formatFileSize(
-    config.DOWNLOAD.MAX_FILE_SIZE
-)}
-│
-│ ⏳ Connecting to the music
-│ service...
-│
-╰───────────────
+╰───────────────`
+            }, { quoted: msg });
 
-🤖 ${config.BOT_NAME}`
+            const result = await getDownload(query, "audio");
+            const file = await downloadBuffer(result.url);
+            const caption = `🎬 *${result.title}*\n\n🤖 ${config.BOT_NAME}`;
 
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                }
-
-            );
-
-
+            return await sock.sendMessage(chatId, {
+                audio: file.buffer,
+                mimetype: result.mimeType || "audio/mpeg",
+                fileName: `${String(result.title).replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "download"}.mp3`,
+                caption
+            }, { quoted: msg });
         } catch (error) {
-
-            console.error(
-
-                "[SONG COMMAND ERROR]",
-
-                error.message
-
-            );
-
-
-            return await sock.sendMessage(
-
-                chatId,
-
-                {
-
-                    text:
-
-`╭─〔 ❌ SONG ERROR 〕
-│
-│ Failed to process your request.
+            console.error("[song COMMAND ERROR]", error.message);
+            return await sock.sendMessage(chatId, {
+                text: `╭─〔 ❌ MP3 ERROR 〕
 │
 │ ${error.message}
 │
 │ Please try again later.
 │
 ╰───────────────`
-
-                },
-
-                {
-
-                    quoted:
-                        msg
-
-                    }
-
-            );
-
+            }, { quoted: msg });
         }
-
     }
-
 };
