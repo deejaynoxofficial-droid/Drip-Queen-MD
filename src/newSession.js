@@ -176,141 +176,67 @@ function getWelcomeMarkerPath(userId) {
 }
 
 
-async function sendWelcomeMessage(userId, sock) {
+// ===============================
+// DRIP QUEEN MD V17 WELCOME SYSTEM
+// ===============================
 
-    const WELCOME_VERSION = "welcome-v1-audio";
-
+async function sendWelcomeMessage(sock) {
     try {
-        if (!sock?.user?.id) {
-            console.warn(`[WELCOME] No bot JID available for ${userId}`);
-            return false;
-        }
+        console.log("[WELCOME TRIGGER] Starting welcome process");
 
-        const markerPath = getWelcomeMarkerPath(userId);
-        let marker = null;
-        try {
-            if (fs.existsSync(markerPath)) {
-                marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
-            }
-        } catch {}
+        const ownerJid = sock.user.id;
 
-        if (marker?.version === WELCOME_VERSION) {
-            console.log(`[WELCOME] Already sent for ${userId}`);
-            return false;
-        }
-
-        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
-        const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
-        const prefix = config.PREFIX || ".";
-        const displayName = String(
+        // Get WhatsApp display name
+        const userName =
             sock.user?.name ||
             sock.user?.verifiedName ||
-            userId ||
-            "there"
-        ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
+            "DRIP USER";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
-        const imagePath = path.isAbsolute(configuredImage)
-            ? configuredImage
-            : path.join(config.ROOT_DIR, configuredImage);
+        const welcomeText = `
+╭━━━━━━━━━━━━━━━━━━━━╮
+┃ 👑 DRIP QUEEN MD
+┃
+┃ ✨ Welcome, ${userName}!
+┃
+┃ 🤖 Bot connected successfully
+┃
+┃ ⚡ Mode    : Public
+┃ 🔹 Prefix  : .
+┃ 📦 Version : 1
+┃
+┃ 💎 Type .menu to explore
+┃
+┃ 👑 NOX STAR TECH
+╰━━━━━━━━━━━━━━━━━━━━╯
+`;
 
-        const audioPath = path.join(config.ROOT_DIR, "assets", "audio", "welcome.ogg");
+        console.log("[WELCOME TARGET]", ownerJid);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃        👑 DRIP QUEEN MD      ┃
-┃                              ┃
-┃      ✨ Welcome, ${displayName}!
-┃                              ┃
-┃   🤖 Your WhatsApp bot is   ┃
-┃      now connected.          ┃
-┃                              ┃
-┃   ⚡ Mode    : Public        ┃
-┃   🔹 Prefix  : ${prefix}             ┃
-┃   📦 Version : 1             ┃
-┃                              ┃
-┃   💎 Type ${prefix}menu to explore ┃
-┃                              ┃
-┃   📢 Official Channel        ┃
-┃   ${channel}
-┃                              ┃
-┃       👑 ${creatorNames}      ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+        // Send image + text
+        await sock.sendMessage(ownerJid, {
+            image: {
+                url: "./assets/bot.png"
+            },
+            caption: welcomeText
+        });
 
-        const targets = [];
-        const addTarget = value => {
-            if (!value || typeof value !== "string") return;
-            try {
-                const normalized = jidNormalizedUser(value);
-                if (normalized && !targets.includes(normalized)) targets.push(normalized);
-            } catch {}
-            if (!targets.includes(value)) targets.push(value);
-        };
+        console.log("[WELCOME IMAGE] Sent successfully");
 
-        addTarget(sock.user.id);
-        addTarget(sock.user.lid);
 
-        const phone = String(userId || "").replace(/\D/g, "");
-        if (phone) addTarget(`${phone}@s.whatsapp.net`);
+        // Send audio separately
+        await sock.sendMessage(ownerJid, {
+            audio: {
+                url: "./assets/audio/welcome.ogg"
+            },
+            mimetype: "audio/ogg; codecs=opus",
+            ptt: true
+        });
 
-        await new Promise(resolve => setTimeout(resolve, 1800));
+        console.log("[WELCOME AUDIO] Sent successfully");
 
-        let sent = false;
-        let lastError = null;
 
-        for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
-            for (const target of targets) {
-                try {
-                    if (fs.existsSync(imagePath)) {
-                        await sock.sendMessage(target, {
-                            image: fs.readFileSync(imagePath),
-                            caption
-                        });
-                    } else {
-                        await sock.sendMessage(target, { text: caption });
-                    }
-
-                    // Send a separate voice/audio welcome immediately after the text/image card.
-                    if (fs.existsSync(audioPath)) {
-                        await sock.sendMessage(target, {
-                            audio: fs.readFileSync(audioPath),
-                            mimetype: "audio/ogg; codecs=opus",
-                            ptt: false
-                        });
-                        console.log(`[WELCOME AUDIO] Sent successfully to ${target} for ${userId}`);
-                    } else {
-                        console.warn(`[WELCOME AUDIO] Missing file: ${audioPath}`);
-                    }
-
-                    sent = true;
-                    console.log(`[WELCOME] Sent successfully to ${target} for ${userId}`);
-                    break;
-                } catch (error) {
-                    lastError = error;
-                    console.warn(`[WELCOME] Send failed to ${target} (attempt ${attempt}): ${error.message}`);
-                }
-            }
-
-            if (!sent && attempt < 3) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-        }
-
-        if (!sent) {
-            throw lastError || new Error("Unable to deliver welcome message to paired account.");
-        }
-
-        fs.mkdirSync(path.dirname(markerPath), { recursive: true });
-        fs.writeFileSync(markerPath, JSON.stringify({
-            sentAt: new Date().toISOString(),
-            version: WELCOME_VERSION,
-            botVersion: "1.0.0"
-        }, null, 2), "utf8");
-
-        return true;
-
-    } catch (error) {
-        console.error(`[WELCOME ERROR] ${userId}:`, error.stack || error.message);
-        return false;
+    } catch (err) {
+        console.log("[WELCOME ERROR]", err);
     }
 }
 
