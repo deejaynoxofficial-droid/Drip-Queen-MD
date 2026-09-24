@@ -219,7 +219,8 @@ future WhatsApp Channel promotions.
 │
 ╰────────────────────
 
-«${config.BOT_NAME}
+> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 `);
 }
 
@@ -378,8 +379,8 @@ To stop receiving promotions:
 
 ${config.PREFIX}unsubscribe
 
-«Powered by ${config.BOT_NAME}
-Created by ${config.CREATOR}
+«> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}
+> Powered by ${config.CREATOR}
 `;
 
             let success = 0;
@@ -451,7 +452,8 @@ Created by ${config.CREATOR}
 │
 ╰────────────────────
 
-«${config.BOT_NAME}
+> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 ${config.CREATOR}
 `);
 
