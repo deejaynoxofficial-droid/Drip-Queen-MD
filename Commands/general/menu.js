@@ -200,7 +200,7 @@ function buildMainMenu(
 ) {
 
     return `╔══════════════════════╗
-║   🤖 DRIP QUEEN MD   ║
+║   🤖 DRIP QUEEN MD.      ║
 ╚══════════════════════╝
 
 Hello ${userName} 👋
@@ -223,13 +223,13 @@ Hello ${userName} 👋
 Reply with a number to open a menu.
 
 Example:
-Reply with 1 for general Menu
-Reply with 2 for download Menu
-Reply with 3 for group Menu
+Reply with 1 for General
+Reply with 2 for Download 
 
 Prefix: ${prefix}
 
-Powered by ${config.BOT_NAME}
+> ${config.BOT_NAME}
+> Powered by ${config.CREATOR}
 `;
 
 }
