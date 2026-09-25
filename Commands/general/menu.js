@@ -34,6 +34,18 @@ const categoryNames = {
     group:
         "GROUP MENU",
 
+    moderation:
+        "MODERATION MENU",
+
+    protection:
+        "PROTECTION MENU",
+
+    "auto features":
+        "AUTO FEATURES MENU",
+
+    information:
+        "INFORMATION MENU",
+
     owner:
         "OWNER MENU",
 
@@ -72,6 +84,18 @@ const categoryEmojis = {
 
     group:
         "👥",
+
+    moderation:
+        "🛡️",
+
+    protection:
+        "🔐",
+
+    "auto features":
+        "⚡",
+
+    information:
+        "ℹ️",
 
     owner:
         "👑",
@@ -133,6 +157,32 @@ const commandEmojis = {
     tagall: "📣",
     hidetag: "🫥",
     goodbye: "👋",
+    admins: "👮",
+    members: "👥",
+    whois: "🔎",
+    mute: "🔇",
+    unmute: "🔊",
+    lock: "🔒",
+    unlock: "🔓",
+    setname: "✏️",
+    setdesc: "📝",
+    setpp: "🖼️",
+    delpp: "🗑️",
+    invite: "🔗",
+    revoke: "♻️",
+    online: "🟢",
+    warn: "⚠️",
+    warnings: "📋",
+    resetwarn: "🧹",
+    delete: "🗑️",
+    antispam: "🚫",
+    antiflood: "🌊",
+    antibot: "🤖",
+    antimention: "🔕",
+    antitag: "🏷️",
+    antinsfw: "🔞",
+    protection: "🛡️",
+    vv: "👁️",
     gpt: "🧠",
     ai: "🤖",
     gemini: "♊",
@@ -252,10 +302,35 @@ function formatCategoryCommands(
    BUILD MAIN MENU
 ========================================== */
 
+function getMainMenuCategories() {
+    return [
+        "general",
+        "download",
+        "group",
+        "moderation",
+        "protection",
+        "auto features",
+        "owner",
+        "channel",
+        "ai",
+        "fun",
+        "tools",
+        "search",
+        "upload",
+        "information"
+    ];
+}
+
 function buildMainMenu(
     userName,
     prefix
 ) {
+    const categories = getMainMenuCategories();
+    const lines = categories.map((category, index) => {
+        const emoji = categoryEmojis[category] || "📂";
+        const name = categoryNames[category] || `${category.toUpperCase()} MENU`;
+        return `│ ${index + 1}️⃣ ${emoji} ${name}`;
+    }).join("\n");
 
     return `╔══════════════════════╗
 ║   🤖 DRIP QUEEN MD   ║
@@ -265,32 +340,17 @@ Hello ${userName} 👋
 
 ╭─〔 MAIN MENU 〕
 │
-│ 1️⃣ General Menu
-│ 2️⃣ Download Menu
-│ 3️⃣ Group Menu
-│ 4️⃣ Owner Menu
-│ 5️⃣ Channel Menu
-│ 6️⃣ AI Menu
-│ 7️⃣ Fun Menu
-│ 8️⃣ Tools Menu
-│ 9️⃣ Search Menu
-│ 🔟 Upload Menu
+${lines}
 │
 ╰───────────────
 
 Reply with a number to open a menu.
-
-Example:
-Reply with 1 for general Menu
-Reply with 2 for download Menu
-Reply with 3 for group Menu
 
 Prefix: ${prefix}
 
 > ${config.BOT_NAME}
 > Powered by ${config.CREATOR}
 `;
-
 }
 
 
@@ -556,18 +616,7 @@ module.exports = {
         if (chatId) {
             createMenuSession(chatId, {
                 type: "main-menu",
-                categories: [
-                    "general",
-                    "download",
-                    "group",
-                    "owner",
-                    "channel",
-                    "ai",
-                    "fun",
-                    "tools",
-                    "search",
-                    "upload"
-                ],
+                categories: getMainMenuCategories(),
                 selectedCategory: null
             });
         }
