@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}autotyping <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -36,7 +37,7 @@ module.exports = {
 
             // Show current status
             if (!option) {
-                const settings = getSettings();
+                const settings = getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -70,8 +71,9 @@ ${config.PREFIX}autotyping off
 
             const success = updateSetting(
                 "autoTyping",
-                enabled
-            );
+                enabled,
+                userId
+                );
 
             if (!success) {
                 return await reply(

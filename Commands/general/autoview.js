@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}autoview <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -41,7 +42,7 @@ module.exports = {
 
             if (!option) {
                 const settings =
-                    getSettings();
+                    getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -90,8 +91,9 @@ WhatsApp Status updates.
             const success =
                 updateSetting(
                     "autoView",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(

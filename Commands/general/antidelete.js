@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}antidelete <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -38,7 +39,7 @@ module.exports = {
             // Show current status
             if (!option) {
                 const settings =
-                    getSettings();
+                    getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -77,8 +78,9 @@ can be detected by the bot.
             const success =
                 updateSetting(
                     "antiDelete",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(

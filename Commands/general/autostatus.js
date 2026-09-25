@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}autostatus <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -36,7 +37,7 @@ module.exports = {
 
             // SHOW CURRENT STATUS
             if (!option) {
-                const settings = getSettings();
+                const settings = getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -77,8 +78,9 @@ WhatsApp status events.
             // UPDATE SETTING
             const success = updateSetting(
                 "autoStatus",
-                enabled
-            );
+                enabled,
+                userId
+                );
 
             if (!success) {
                 return await reply(

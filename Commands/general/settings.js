@@ -121,8 +121,8 @@ function featureKey(value) {
 }
 
 function renderSettings(context = {}) {
-    const bot = getBotSettings();
-    const auto = getAutoSettings();
+    const bot = getBotSettings(context.userId);
+    const auto = getAutoSettings(context.userId);
     let dashboardPassword = "Unavailable";
     try {
         if (context.isGroup) {
@@ -221,8 +221,8 @@ async function sendDashboard(context) {
     return context.reply(caption);
 }
 
-function renderFeatureStatus() {
-    const auto = getAutoSettings();
+function renderFeatureStatus(context = {}) {
+    const auto = getAutoSettings(context.userId);
     const lines = Object.keys(DEFAULT_SETTINGS)
         .map(key => `${FEATURE_LABELS[key] || key}: ${status(auto[key])}`)
         .join("\n");
@@ -290,8 +290,8 @@ module.exports = {
                 if (!value || value.length > 3 || /\s/.test(value)) {
                     return reply(`❌ Prefix must be 1-3 characters with no spaces.\nExample: ${config.PREFIX}settings prefix !`);
                 }
-                updateBotSetting("prefix", value);
-                return reply(`✅ Prefix changed to: *${config.PREFIX}*\n\n${footer()}`);
+                updateBotSetting("prefix", value, context.userId);
+                return reply(`✅ Prefix changed to: *${getBotSettings(context.userId).prefix}*\n\n${footer()}`);
             }
 
             if (action === "mode") {
@@ -299,32 +299,32 @@ module.exports = {
                 if (!["public", "private"].includes(value)) {
                     return reply(`❌ Use: ${config.PREFIX}settings mode public\nor\n${config.PREFIX}settings mode private`);
                 }
-                updateBotSetting("mode", value);
-                return reply(`✅ Bot mode changed to: *${config.MODE}*\n\n${footer()}`);
+                updateBotSetting("mode", value, context.userId);
+                return reply(`✅ Bot mode changed to: *${getBotSettings(context.userId).mode}*\n\n${footer()}`);
             }
 
             if (["auto", "autofeature", "features", "feature"].includes(action)) {
                 const featureArg = String(args[1] || "").trim().toLowerCase();
                 if (!featureArg || ["status", "list", "show"].includes(featureArg)) {
-                    return reply(renderFeatureStatus());
+                    return reply(renderFeatureStatus(context));
                 }
 
                 const feature = featureKey(featureArg);
                 if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, feature)) {
-                    return reply(`❌ Unknown auto feature.\n\n${renderFeatureStatus()}`);
+                    return reply(`❌ Unknown auto feature.\n\n${renderFeatureStatus(context)}`);
                 }
-                return changeFeature(feature, args[2], reply);
+                return changeFeature(feature, args[2], reply, context);
             }
 
             if (["reset", "restore"].includes(action)) {
-                resetBotSettings();
+                resetBotSettings(context.userId);
                 return sendDashboard(context);
             }
 
             // Direct feature syntax: .settings autoview on|off|toggle
             const feature = featureKey(action);
             if (Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, feature)) {
-                return changeFeature(feature, args[1], reply);
+                return changeFeature(feature, args[1], reply, context);
             }
 
             return reply(`❌ Unknown settings option.\n\n${renderSettings(context)}`);
@@ -335,8 +335,8 @@ module.exports = {
     }
 };
 
-function changeFeature(feature, requestedValue, reply) {
-    const current = Boolean(getAutoSettings()[feature]);
+function changeFeature(feature, requestedValue, reply, context = {}) {
+    const current = Boolean(getAutoSettings(context.userId)[feature]);
     const valueArg = String(requestedValue || "").trim().toLowerCase();
 
     let next;
@@ -350,7 +350,7 @@ function changeFeature(feature, requestedValue, reply) {
         return reply(`❌ Use: ${config.PREFIX}settings ${feature} on|off\n\nCurrent: ${status(current)}`);
     }
 
-    const saved = updateAutoSetting(feature, next);
+    const saved = updateAutoSetting(feature, next, context.userId);
     if (!saved) return reply(`❌ Failed to save ${feature}.`);
 
     return reply(

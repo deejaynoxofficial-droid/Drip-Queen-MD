@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}autoreply <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -38,7 +39,7 @@ module.exports = {
             // Show current status
             if (!option) {
                 const settings =
-                    getSettings();
+                    getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -73,8 +74,9 @@ ${config.PREFIX}autoreply off
             const success =
                 updateSetting(
                     "autoReply",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(

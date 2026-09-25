@@ -26,6 +26,7 @@ module.exports = {
         `${config.PREFIX}autoreact <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -37,7 +38,7 @@ module.exports = {
             // Show current status
             if (!option) {
                 const settings =
-                    getSettings();
+                    getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -70,8 +71,9 @@ ${config.PREFIX}autoreact off
             const success =
                 updateSetting(
                     "autoReact",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(

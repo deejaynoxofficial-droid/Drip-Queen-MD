@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}autorecording <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -37,7 +38,7 @@ module.exports = {
 
             // Show current status
             if (!option) {
-                const settings = getSettings();
+                const settings = getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -75,8 +76,9 @@ ${config.PREFIX}autorecording off
             const success =
                 updateSetting(
                     "autoRecording",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(

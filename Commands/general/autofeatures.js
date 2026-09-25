@@ -27,11 +27,12 @@ module.exports = {
         `${config.PREFIX}autofeatures`,
 
     execute: async ({
+        userId,
         reply,
         react
     }) => {
         try {
-            const settings = getSettings();
+            const settings = getSettings(userId);
 
             await react("🤖");
 

@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}antilink <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -35,7 +36,7 @@ module.exports = {
             const option = args[0]?.toLowerCase();
 
             if (!option) {
-                const settings = getSettings();
+                const settings = getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -67,8 +68,9 @@ enforcement actions to work.
 
             const success = updateSetting(
                 "antiLink",
-                enabled
-            );
+                enabled,
+                userId
+                );
 
             if (!success) {
                 return await reply(
