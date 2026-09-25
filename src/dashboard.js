@@ -4,6 +4,14 @@ const path = require("path");
 const fs = require("fs");
 
 const config = require("../config");
+const {
+    requireConnectedUser,
+    loginUser,
+    normalizeUserId,
+    hasSavedSession
+} = require("../lib/dashboardAuth");
+const { defaults: PROTECTION_DEFAULTS, get: getGroupProtection, set: setGroupProtection } = require("../lib/groupProtection");
+const { getBotSettings, updateBotSetting } = require("../lib/botSettings");
 
 /*
    Optional persistent bot worker URL.
@@ -128,7 +136,7 @@ const DEFAULT_FEATURES = {
 
     autoReact: false,
 
-    autoStatusView: false,
+    autoStatus: false,
 
     autoReply: false,
 
@@ -245,6 +253,53 @@ function requireAdmin(req, res, next) {
     next();
 }
 
+function requireUserOrAdmin(req, res, next) {
+    if (verifyAdminToken(getAdminToken(req))) {
+        req.isAdmin = true;
+        return next();
+    }
+    const verifier = require("../lib/dashboardAuth").verifyUserToken;
+    const user = verifier(getUserToken(req));
+    if (!user || !hasSavedSession(user.userId)) {
+        return res.status(401).json({
+            success: false,
+            error: "Connected-user authentication required"
+        });
+    }
+    req.connectedUser = user;
+    next();
+}
+
+function getUserToken(req) {
+    const auth = String(req.headers.authorization || "");
+    if (/^Bearer\s+/i.test(auth)) return auth.replace(/^Bearer\s+/i, "").trim();
+    return String(req.headers["x-user-token"] || "").trim();
+}
+
+function authenticateUserRequest(req, res) {
+    const token = getUserToken(req);
+    const verifier = require("../lib/dashboardAuth").verifyUserToken;
+    const user = verifier(token);
+    if (!user || !hasSavedSession(user.userId)) {
+        res.status(401).json({ success: false, error: "Connected-user authentication required" });
+        return null;
+    }
+    return user;
+}
+
+async function requireGroupAdminSocket(sock, groupId, userId) {
+    if (!sock || !groupId || !groupId.endsWith("@g.us") || typeof sock.groupMetadata !== "function") return null;
+    const metadata = await sock.groupMetadata(groupId);
+    const wanted = normalizeUserId(userId);
+    const member = (metadata.participants || []).find(participant => {
+        return [participant?.id, participant?.jid, participant?.lid]
+            .filter(Boolean)
+            .some(jid => normalizeUserId(String(jid).split("@")[0].split(":")[0]) === wanted);
+    });
+    if (!member || !member.admin) return null;
+    return metadata;
+}
+
 /* ==========================================
    CREATE DASHBOARD
 ========================================== */
@@ -326,6 +381,184 @@ function createDashboard(app) {
         }
     );
 
+
+    /* ======================================
+       CONNECTED USER SETTINGS AUTHENTICATION
+       Only users with a saved WhatsApp session
+       can enter the settings page.
+    ====================================== */
+
+    app.post(
+        "/api/user/login",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    const result = await workerRequest(
+                        "/api/user/login",
+                        { method: "POST", body: JSON.stringify(req.body || {}) }
+                    );
+                    return res.json(result);
+                }
+
+                const number = normalizeUserId(req.body?.phoneNumber || req.body?.number);
+                const password = String(req.body?.password || "");
+                const result = loginUser(number, password);
+                if (!result.success) {
+                    return res.status(401).json(result);
+                }
+                return res.json(result);
+            } catch (error) {
+                return res.status(500).json({ success: false, error: error.message || "Unable to authenticate connected user." });
+            }
+        }
+    );
+
+    app.get(
+        "/api/user/me",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest("/api/user/me", {
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                return res.json({ success: true, userId: user.userId });
+            } catch (error) {
+                return res.status(500).json({ success: false, error: error.message || "Unable to verify connected user." });
+            }
+        }
+    );
+
+    app.get(
+        "/api/user/settings",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest("/api/user/settings", {
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                const bot = getBotSettings();
+                res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION, creator: config.CREATOR, botName: config.BOT_NAME }, features: getFeatureSettings(), protectionKeys: PROTECTION_DEFAULTS });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message || "Failed to load user settings." });
+            }
+        }
+    );
+
+    app.post(
+        "/api/user/settings",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest("/api/user/settings", {
+                        method: "POST",
+                        body: JSON.stringify(req.body || {}),
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                const body = req.body || {};
+                if (typeof body.prefix === "string") updateBotSetting("prefix", body.prefix.trim());
+                if (typeof body.mode === "string" && ["public", "private"].includes(body.mode.toLowerCase())) updateBotSetting("mode", body.mode.toLowerCase());
+                if (body.features && typeof body.features === "object") {
+                    const current = getFeatureSettings();
+                    for (const [key, value] of Object.entries(body.features)) {
+                        if (Object.prototype.hasOwnProperty.call(DEFAULT_FEATURES, key) && typeof value === "boolean") current[key] = value;
+                    }
+                    saveFeatureSettings(current);
+                }
+                const bot = getBotSettings();
+                return res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION }, features: getFeatureSettings(), protectionKeys: PROTECTION_DEFAULTS });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message || "Failed to save user settings." });
+            }
+        }
+    );
+
+    app.get(
+        "/api/user/groups",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest("/api/user/groups", {
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                const sock = newSession?.getSessionSocket?.(user.userId);
+                if (!sock || typeof sock.groupFetchAllParticipating !== "function") {
+                    return res.status(503).json({ success: false, error: "WhatsApp session is not currently connected." });
+                }
+                const groups = await sock.groupFetchAllParticipating();
+                const list = Object.entries(groups || {}).map(([jid, group]) => ({
+                    id: jid,
+                    subject: group?.subject || jid,
+                    participants: Array.isArray(group?.participants) ? group.participants.length : 0
+                })).sort((a, b) => a.subject.localeCompare(b.subject));
+                return res.json({ success: true, groups: list });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message || "Failed to load groups." });
+            }
+        }
+    );
+
+    app.get(
+        "/api/user/groups/:groupId/protection",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest(`/api/user/groups/${encodeURIComponent(req.params.groupId)}/protection`, {
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                const groupId = decodeURIComponent(req.params.groupId || "");
+                const sock = newSession?.getSessionSocket?.(user.userId);
+                const metadata = await requireGroupAdminSocket(sock, groupId, user.userId);
+                if (!metadata) return res.status(403).json({ success: false, error: "You must be a group admin to manage protection settings." });
+                return res.json({ success: true, groupId, protection: getGroupProtection(groupId) });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message || "Failed to load group protection." });
+            }
+        }
+    );
+
+    app.post(
+        "/api/user/groups/:groupId/protection",
+        async (req, res) => {
+            try {
+                if (BOT_WORKER_URL) {
+                    return res.json(await workerRequest(`/api/user/groups/${encodeURIComponent(req.params.groupId)}/protection`, {
+                        method: "POST",
+                        body: JSON.stringify(req.body || {}),
+                        headers: { Authorization: `Bearer ${getUserToken(req)}` }
+                    }));
+                }
+                const user = authenticateUserRequest(req, res);
+                if (!user) return;
+                const groupId = decodeURIComponent(req.params.groupId || "");
+                const key = String(req.body?.key || "").toLowerCase();
+                const enabled = req.body?.enabled;
+                if (!Object.prototype.hasOwnProperty.call(PROTECTION_DEFAULTS, key) || typeof enabled !== "boolean") {
+                    return res.status(400).json({ success: false, error: "Invalid protection setting." });
+                }
+                const sock = newSession?.getSessionSocket?.(user.userId);
+                const metadata = await requireGroupAdminSocket(sock, groupId, user.userId);
+                if (!metadata) return res.status(403).json({ success: false, error: "You must be a group admin to manage protection settings." });
+                return res.json({ success: true, groupId, protection: setGroupProtection(groupId, key, enabled) });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message || "Failed to save group protection." });
+            }
+        }
+    );
 
     /* ======================================
        ADMIN LOGIN
@@ -868,6 +1101,7 @@ function createDashboard(app) {
 
     app.get(
         "/api/features",
+        requireUserOrAdmin,
         async (req, res) => {
 
             try {
@@ -918,6 +1152,7 @@ function createDashboard(app) {
 
     app.post(
         "/api/features/:featureName",
+        requireUserOrAdmin,
         async (req, res) => {
 
             try {
@@ -1035,6 +1270,7 @@ function createDashboard(app) {
 
     app.get(
         "/api/settings",
+        requireUserOrAdmin,
         async (req, res) => {
 
             try {
@@ -1079,6 +1315,7 @@ function createDashboard(app) {
 
     app.post(
         "/api/settings",
+        requireUserOrAdmin,
         async (req, res) => {
 
             try {
