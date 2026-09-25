@@ -27,6 +27,7 @@ module.exports = {
         `${config.PREFIX}goodbye <on/off>`,
 
     execute: async ({
+        userId,
         args,
         reply,
         react
@@ -41,7 +42,7 @@ module.exports = {
 
             if (!option) {
                 const settings =
-                    getSettings();
+                    getSettings(userId);
 
                 return await reply(`
 ╔══════════════════════════════╗
@@ -90,8 +91,9 @@ leaves or is removed from a group.
             const success =
                 updateSetting(
                     "goodbye",
-                    enabled
-                );
+                    enabled,
+                    userId
+                    );
 
             if (!success) {
                 return await reply(
