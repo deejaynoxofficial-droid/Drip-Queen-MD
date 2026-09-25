@@ -30,6 +30,7 @@ let makeCacheableSignalKeyStore;
 let Browsers;
 let jidNormalizedUser;
 let areJidsSameUser;
+let downloadMediaMessage;
 
 async function loadBaileys() {
     if (!baileysModule) {
@@ -49,7 +50,8 @@ async function loadBaileys() {
             makeCacheableSignalKeyStore,
             Browsers,
             jidNormalizedUser,
-            areJidsSameUser
+            areJidsSameUser,
+            downloadMediaMessage
         } = baileysModule);
     }
     return baileysModule;
@@ -74,6 +76,72 @@ try {
 ========================================== */
 
 const activeSessions = new Map();
+
+
+/* ==========================================
+   ANTI DELETE MESSAGE CACHE
+   ------------------------------------------
+   Keep a bounded, short-lived copy of incoming
+   messages so a revoke event can be restored.
+========================================== */
+const deletedMessageCache = new Map();
+const DELETE_CACHE_MAX = 300;
+const DELETE_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+function cacheIncomingMessage(userId, msg) {
+    try {
+        if (!userId || !msg?.key?.id || !msg?.message) return;
+        // Do not cache messages sent by the bot/linked account.
+        if (msg.key.fromMe) return;
+
+        let cache = deletedMessageCache.get(userId);
+        if (!cache) {
+            cache = new Map();
+            deletedMessageCache.set(userId, cache);
+        }
+
+        const now = Date.now();
+        for (const [id, item] of cache) {
+            if (!item || now - item.cachedAt > DELETE_CACHE_TTL) {
+                cache.delete(id);
+            }
+        }
+
+        const cacheKey = `${msg.key.remoteJid || "unknown"}:${msg.key.id}`;
+        cache.set(cacheKey, {
+            message: msg,
+            cachedAt: now
+        });
+
+        while (cache.size > DELETE_CACHE_MAX) {
+            const oldest = cache.keys().next().value;
+            if (oldest === undefined) break;
+            cache.delete(oldest);
+        }
+    } catch (error) {
+        console.error('[ANTI DELETE CACHE ERROR]', error.message);
+    }
+}
+
+function getCachedMessage(userId, chatId, messageId) {
+    const cache = deletedMessageCache.get(userId);
+    if (!cache || !chatId || !messageId) return null;
+
+    const cacheKey = `${chatId}:${messageId}`;
+    const item = cache.get(cacheKey);
+    if (!item) return null;
+
+    if (Date.now() - item.cachedAt > DELETE_CACHE_TTL) {
+        cache.delete(cacheKey);
+        return null;
+    }
+
+    return item.message || null;
+}
+
+function clearDeletedMessageCache(userId) {
+    if (userId) deletedMessageCache.delete(userId);
+}
 
 
 /* ==========================================
@@ -223,19 +291,19 @@ function scheduleChannelPromotion(userId, sock, target, delayMs = 30000) {
                 ? botImage
                 : path.join(config.ROOT_DIR, botImage);
 
-            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃       📢 DRIP QUEEN CHANNEL   
-┃                              
-┃   👑 Stay connected with     
-┃      DRIP QUEEN MD           
-┃                              
-┃   ✨ New updates             
-┃   ⚡ Features & releases     
-┃   📣 Official announcements  
-┃                              
-┃   👉 Follow the official     
-┃      WhatsApp Channel       
-╰━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃       📢 DRIP QUEEN CHANNEL   ┃
+┃                              ┃
+┃   👑 Stay connected with     ┃
+┃      DRIP QUEEN MD           ┃
+┃                              ┃
+┃   ✨ New updates              ┃
+┃   ⚡ Features & releases     ┃
+┃   📣 Official announcements  ┃
+┃                              ┃
+┃   👉 Follow the official     ┃
+┃      WhatsApp Channel       ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
             const message = {
                 text: `${caption}\n\n${channel}`,
@@ -324,7 +392,7 @@ async function sendWelcomeMessage(userId, sock) {
             return false;
         }
 
-        const creatorNames = config.CREATORS || "> NOX STAR TECH";
+        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
         const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
         const prefix = config.PREFIX || ".";
         const displayName = String(
@@ -334,7 +402,7 @@ async function sendWelcomeMessage(userId, sock) {
             "there"
         ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot1.png");
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
@@ -343,25 +411,25 @@ async function sendWelcomeMessage(userId, sock) {
 
         console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃        👑 DRIP QUEEN MD      
-┃                              
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 DRIP QUEEN MD      ┃
+┃                              ┃
 ┃      ✨ Welcome, ${displayName}!
-┃                              
-┃   🤖 Your WhatsApp bot is   
-┃      now connected.          
-┃                              
-┃   ⚡ Mode    : Public        
-┃   🔹 Prefix  : ${prefix}      
-┃   📦 Version : 1.0.0             
-┃                              
-┃   💎 Type ${prefix}menu to explore
-┃                              
-┃   📢 Official Channel        
+┃                              ┃
+┃   🤖 Your WhatsApp bot is   ┃
+┃      now connected.          ┃
+┃                              ┃
+┃   ⚡ Mode    : Public        ┃
+┃   🔹 Prefix  : ${prefix}             ┃
+┃   📦 Version : 1             ┃
+┃                              ┃
+┃   💎 Type ${prefix}menu to explore ┃
+┃                              ┃
+┃   📢 Official Channel        ┃
 ┃   ${channel}
-┃                              
-┃       👑 ${creatorNames}      
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+┃                              ┃
+┃       👑 ${creatorNames}      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
         const addTarget = value => {
@@ -511,6 +579,37 @@ function attachSessionHandlers(
 
         }
 
+    );
+
+
+    /*
+       ANTI DELETE / MESSAGE REVOKE
+       Baileys delivers a deleted-message notice through messages.update
+       with a protocolMessage whose type is REVOKE.
+    */
+    sock.ev.on(
+
+        "messages.update",
+
+        async updates => {
+
+            try {
+                if (!Array.isArray(updates)) return;
+
+                for (const item of updates) {
+                    await handleMessageRevoke(
+                        sock,
+                        userId,
+                        item
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    `[ANTI DELETE UPDATE ERROR] ${userId}:`,
+                    error.message
+                );
+            }
+        }
     );
 
 }
@@ -1108,6 +1207,11 @@ async function handleMessages(
             }
 
 
+            // Cache the original before any command/auto-feature processing.
+            if (getFeatureSettings().antiDelete === true) {
+                cacheIncomingMessage(userId, msg);
+            }
+
             const text =
                 getMessageText(msg);
 
@@ -1604,6 +1708,233 @@ async function findCommand(
 
 
 /* ==========================================
+   AUTO PRESENCE HELPERS
+========================================== */
+const autoPresenceTimers = new Map();
+
+function randomBetween(min, max) {
+    return Math.floor(
+        min + Math.random() * (max - min + 1)
+    );
+}
+
+function getPresenceTimerKey(sock, chatId) {
+    return `${sock?.user?.id || "session"}:${chatId}`;
+}
+
+function stopAutoPresence(sock, chatId) {
+    const key = getPresenceTimerKey(sock, chatId);
+    const timer = autoPresenceTimers.get(key);
+    if (timer) {
+        clearTimeout(timer);
+        autoPresenceTimers.delete(key);
+    }
+
+    if (sock && chatId) {
+        sock.sendPresenceUpdate(
+            "paused",
+            chatId
+        ).catch(() => {});
+    }
+}
+
+
+/* ==========================================
+   ANTI DELETE / REVOKE HANDLER
+========================================== */
+async function handleMessageRevoke(sock, userId, item) {
+    try {
+        const update = item?.update || {};
+        const protocol = update?.message?.protocolMessage;
+        if (!protocol) return false;
+
+        const revokeType = protocol.type;
+        const isRevoke =
+            revokeType === 0 ||
+            revokeType === "REVOKE" ||
+            revokeType === 5;
+
+        if (!isRevoke) return false;
+
+        const targetKey = protocol.key;
+        const chatId =
+            targetKey?.remoteJid ||
+            update?.key?.remoteJid;
+        const messageId = targetKey?.id;
+
+        if (!chatId || !messageId) return false;
+
+        const features = getFeatureSettings();
+        if (features.antiDelete !== true) return false;
+
+        // Never restore a message that was sent by the linked account.
+        if (targetKey?.fromMe === true) return false;
+
+        const original =
+            getCachedMessage(userId, chatId, messageId);
+
+        if (!original?.message) {
+            await sock.sendMessage(chatId, {
+                text: "🗑️ *ANTI DELETE*\n\nA message was deleted, but its original content is no longer available in the bot cache."
+            });
+            return true;
+        }
+
+        const deletedBy =
+            update?.key?.participant ||
+            update?.key?.remoteJid ||
+            targetKey?.participant ||
+            "Unknown user";
+
+        const sender =
+            original.pushName ||
+            original.key?.participant ||
+            original.key?.remoteJid ||
+            "Unknown sender";
+
+        const content = await buildRecoveredMessageContent(original);
+
+        const header =
+            `🗑️ *ANTI DELETE*\n\n` +
+            `👤 Sender: ${sender}\n` +
+            `🚮 Deleted by: ${deletedBy}\n\n`;
+
+        if (content) {
+            if (typeof content === "string") {
+                await sock.sendMessage(chatId, {
+                    text: header + content
+                });
+            } else {
+                const caption = content.caption
+                    ? header + content.caption
+                    : header.trim();
+                if (content.caption !== undefined) {
+                    content.caption = caption;
+                } else {
+                    content.caption = caption;
+                }
+                await sock.sendMessage(chatId, content);
+            }
+        } else {
+            const text = getMessageText(original);
+            await sock.sendMessage(chatId, {
+                text: header + (text || "Original message content could not be recovered.")
+            });
+        }
+
+        // The entry is no longer needed after a revoke is handled.
+        const cache = deletedMessageCache.get(userId);
+        cache?.delete(`${chatId}:${messageId}`);
+        return true;
+    } catch (error) {
+        console.error("[ANTI DELETE ERROR]", error.stack || error.message);
+        return false;
+    }
+}
+
+async function buildRecoveredMessageContent(msg) {
+    try {
+        const originalMessage = unwrapMessageForRecovery(msg?.message);
+        if (!originalMessage) return null;
+
+        const text = getMessageText(msg);
+        if (text && !hasRecoverableMedia(originalMessage)) {
+            return text;
+        }
+
+        const type =
+            originalMessage.imageMessage ? "image" :
+            originalMessage.videoMessage ? "video" :
+            originalMessage.audioMessage ? "audio" :
+            originalMessage.documentMessage ? "document" :
+            originalMessage.stickerMessage ? "sticker" :
+            null;
+
+        if (!type || typeof downloadMediaMessage !== "function") {
+            return text || null;
+        }
+
+        const buffer = await downloadMediaMessage(
+            msg,
+            "buffer",
+            {},
+            {
+                logger: pino({ level: "silent" })
+            }
+        );
+
+        if (!buffer) return text || null;
+
+        if (type === "image") {
+            return {
+                image: buffer,
+                caption: originalMessage.imageMessage?.caption || undefined
+            };
+        }
+        if (type === "video") {
+            return {
+                video: buffer,
+                caption: originalMessage.videoMessage?.caption || undefined
+            };
+        }
+        if (type === "audio") {
+            return {
+                audio: buffer,
+                mimetype: originalMessage.audioMessage?.mimetype || "audio/mpeg",
+                ptt: Boolean(originalMessage.audioMessage?.ptt)
+            };
+        }
+        if (type === "document") {
+            return {
+                document: buffer,
+                mimetype: originalMessage.documentMessage?.mimetype || "application/octet-stream",
+                fileName: originalMessage.documentMessage?.fileName || "deleted-document"
+            };
+        }
+        if (type === "sticker") {
+            return { sticker: buffer };
+        }
+    } catch (error) {
+        console.error("[ANTI DELETE MEDIA RECOVERY ERROR]", error.message);
+    }
+
+    return getMessageText(msg) || null;
+}
+
+function unwrapMessageForRecovery(message) {
+    let current = message;
+    let changed = true;
+    while (current && changed) {
+        changed = false;
+        for (const key of [
+            "ephemeralMessage",
+            "viewOnceMessage",
+            "viewOnceMessageV2",
+            "viewOnceMessageV2Extension",
+            "documentWithCaptionMessage"
+        ]) {
+            if (current?.[key]?.message) {
+                current = current[key].message;
+                changed = true;
+                break;
+            }
+        }
+    }
+    return current || null;
+}
+
+function hasRecoverableMedia(message) {
+    return Boolean(
+        message?.imageMessage ||
+        message?.videoMessage ||
+        message?.audioMessage ||
+        message?.documentMessage ||
+        message?.stickerMessage
+    );
+}
+
+
+/* ==========================================
    AUTO FEATURES
 ========================================== */
 
@@ -1650,78 +1981,65 @@ async function handleAutoFeatures(
 
 
         /*
-           AUTO TYPING
+           AUTO TYPING / AUTO RECORDING
+           --------------------------------
+           Use one presence at a time. Durations are slightly randomized so
+           the bot feels natural instead of flashing the status for 1.5s.
+           Text messages prefer typing; media messages prefer recording when
+           both features are enabled.
         */
+        const wantsTyping = features.autoTyping === true;
+        const wantsRecording = features.autoRecording === true;
+        const isMediaMessage = Boolean(
+            msg?.message?.imageMessage ||
+            msg?.message?.videoMessage ||
+            msg?.message?.audioMessage ||
+            msg?.message?.documentMessage ||
+            msg?.message?.stickerMessage
+        );
 
-        if (
-            features.autoTyping === true
-        ) {
-
-            try {
-
-                await sock.sendPresenceUpdate(
-                    "composing",
-                    chatId
-                );
-
-
-                setTimeout(
-                    () => {
-
-                        sock
-                            .sendPresenceUpdate(
-                                "paused",
-                                chatId
-                            )
-                            .catch(
-                                () => {}
-                            );
-
-                    },
-
-                    1500
-                );
-
-            } catch (error) {}
-
+        let presenceType = null;
+        if (wantsTyping && wantsRecording) {
+            presenceType = isMediaMessage ? "recording" : "composing";
+        } else if (wantsTyping) {
+            presenceType = "composing";
+        } else if (wantsRecording) {
+            presenceType = "recording";
         }
 
-
-        /*
-           AUTO RECORDING
-        */
-
-        if (
-            features.autoRecording === true
-        ) {
-
+        if (presenceType) {
             try {
+                stopAutoPresence(sock, chatId);
+
+                const min = presenceType === "composing" ? 2500 : 3000;
+                const max = presenceType === "composing" ? 4500 : 5500;
+                const duration = randomBetween(min, max);
 
                 await sock.sendPresenceUpdate(
-                    "recording",
+                    presenceType,
                     chatId
                 );
 
+                const timer = setTimeout(() => {
+                    try {
+                        sock.sendPresenceUpdate(
+                            "paused",
+                            chatId
+                        ).catch(() => {});
+                    } finally {
+                        const key = getPresenceTimerKey(sock, chatId);
+                        const current = autoPresenceTimers.get(key);
+                        if (current === timer) {
+                            autoPresenceTimers.delete(key);
+                        }
+                    }
+                }, duration);
 
-                setTimeout(
-                    () => {
-
-                        sock
-                            .sendPresenceUpdate(
-                                "paused",
-                                chatId
-                            )
-                            .catch(
-                                () => {}
-                            );
-
-                    },
-
-                    1500
+                autoPresenceTimers.set(
+                    getPresenceTimerKey(sock, chatId),
+                    timer
                 );
-
             } catch (error) {}
-
         }
 
 
