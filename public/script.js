@@ -14,8 +14,8 @@ const FEATURE_ALIASES = {
     autorecording: "autoRecording",
     autoread: "autoRead",
     alwaysonline: "alwaysOnline",
-    autostatus: "autoStatusView",
-    autostatusview: "autoStatusView",
+    autostatus: "autoStatus",
+    autostatusview: "autoStatus",
     antivall: "antiCall",
     anticall: "antiCall",
     autobio: "autoBio",
@@ -27,7 +27,7 @@ let apiOnline = false;
 const PAGE_META = {
     home: ["Dashboard", "Overview and live bot status"],
     pairing: ["Connect WhatsApp", "Generate a secure WhatsApp pairing code"],
-    autofeatures: ["Auto Features", "Control automated bot features"],
+    autofeatures: ["Settings", "Manage bot settings for a connected WhatsApp user"],
     commands: ["Commands", "Browse commands loaded from the Commands folder"],
     settings: ["Settings", "Configure your bot" ]
 };
@@ -556,6 +556,283 @@ function initializeFeatureControls() {
 }
 
 /* ==========================================
+   CONNECTED USER SETTINGS
+========================================== */
+
+const USER_FEATURE_LABELS = {
+    autoRead: ["📖", "Auto Read", "Automatically mark incoming messages as read."],
+    autoTyping: ["⌨️", "Auto Typing", "Show typing presence automatically."],
+    autoRecording: ["🎙️", "Auto Recording", "Show recording presence automatically."],
+    alwaysOnline: ["🟢", "Always Online", "Keep the connected bot presence available."],
+    autoReact: ["❤️", "Auto React", "Automatically react to incoming messages."],
+    autoStatus: ["📡", "Auto Status", "Handle status automation according to the bot settings."],
+    autoReply: ["💬", "Auto Reply", "Automatically reply to configured messages."],
+    antiDelete: ["🗑️", "Anti Delete", "Handle deleted messages when supported."],
+    antiLink: ["🔗", "Anti Link", "Detect and manage unwanted links."],
+    antiCall: ["📵", "Anti Call", "Control incoming call handling."],
+    welcome: ["👋", "Welcome", "Send welcome messages for new group members."],
+    goodbye: ["🚪", "Goodbye", "Send goodbye messages when members leave."],
+    autoBio: ["📝", "Auto Bio", "Manage the automatic profile bio feature."],
+    autoView: ["👁️", "Auto View", "Automatically view supported incoming media/status content."]
+};
+
+const USER_PROTECTION_LABELS = {
+    antispam: ["🚫", "Anti Spam", "Reduce repeated/spam activity in this group."],
+    antiflood: ["🌊", "Anti Flood", "Reduce message flooding in this group."],
+    antibot: ["🤖", "Anti Bot", "Apply the configured anti-bot protection."],
+    antimention: ["🔕", "Anti Mention", "Control unwanted mass mentions."],
+    antitag: ["🏷️", "Anti Tag", "Control unwanted tagging activity."],
+    antinsfw: ["🔞", "Anti NSFW", "Apply the configured NSFW protection. "]
+};
+
+function getUserSettingsToken() {
+    return sessionStorage.getItem("dripQueenUserSettingsToken") || "";
+}
+
+function clearUserSettingsToken() {
+    sessionStorage.removeItem("dripQueenUserSettingsToken");
+}
+
+async function userSettingsRequest(url, options = {}, timeoutMs = 10000) {
+    const token = getUserSettingsToken();
+    if (!token) throw new Error("Connected-user login required");
+    return apiRequest(url, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            ...(options.headers || {})
+        }
+    }, timeoutMs);
+}
+
+function normalizeSettingsPhone(value) {
+    return String(value || "").replace(/\D/g, "");
+}
+
+async function connectedUserLogin(phoneNumber, password) {
+    const data = await apiRequest("/api/user/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber, password })
+    });
+    if (!data.token) throw new Error("Dashboard token was not returned");
+    sessionStorage.setItem("dripQueenUserSettingsToken", data.token);
+    sessionStorage.setItem("dripQueenUserSettingsNumber", data.userId || phoneNumber);
+    return data;
+}
+
+function showUserSettingsLogin() {
+    document.getElementById("userSettingsLoginCard")?.classList.remove("hidden");
+    document.getElementById("userSettingsPanel")?.classList.add("hidden");
+}
+
+function showUserSettingsPanel() {
+    document.getElementById("userSettingsLoginCard")?.classList.add("hidden");
+    document.getElementById("userSettingsPanel")?.classList.remove("hidden");
+}
+
+function renderUserFeatureCards(features = {}) {
+    const grid = document.getElementById("userAutoFeaturesGrid");
+    if (!grid) return;
+    grid.innerHTML = Object.entries(USER_FEATURE_LABELS).map(([key, info]) => `
+        <div class="feature-card">
+            <div class="feature-info">
+                <div class="feature-icon">${info[0]}</div>
+                <div><h3>${escapeHTML(info[1])}</h3><p>${escapeHTML(info[2])}</p></div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" data-user-feature="${escapeHTML(key)}" ${features[key] === true ? "checked" : ""}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    `).join("");
+
+    grid.querySelectorAll("[data-user-feature]").forEach(input => {
+        input.addEventListener("change", async event => {
+            const key = event.target.dataset.userFeature;
+            try {
+                await userSettingsRequest("/api/user/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ features: { [key]: event.target.checked } })
+                });
+                showToast(`${USER_FEATURE_LABELS[key]?.[1] || key} ${event.target.checked ? "enabled" : "disabled"}`, "success");
+            } catch (error) {
+                event.target.checked = !event.target.checked;
+                showToast(error.message, "error");
+            }
+        });
+    });
+}
+
+async function loadUserSettings() {
+    const data = await userSettingsRequest("/api/user/settings");
+    const bot = data.bot || {};
+    const userId = data.userId || sessionStorage.getItem("dripQueenUserSettingsNumber") || "";
+
+    updateElement("userSettingsIdentity", userId);
+    updateElement("userSettingNumber", userId);
+    updateElement("userSettingBotName", bot.botName || bot.name || "DRIP QUEEN MD");
+    updateElement("userSettingVersion", bot.version || "1.0.0");
+    updateElement("userSettingCreator", bot.creator || "NOX STAR TECH");
+
+    const prefix = document.getElementById("userSettingPrefix");
+    const mode = document.getElementById("userSettingMode");
+    if (prefix) prefix.value = bot.prefix || ".";
+    if (mode) mode.value = String(bot.mode || "public").toLowerCase();
+
+    renderUserFeatureCards(data.features || {});
+    await loadUserGroups();
+}
+
+async function loadUserGroups() {
+    const select = document.getElementById("userSettingsGroup");
+    if (!select) return;
+    try {
+        const data = await userSettingsRequest("/api/user/groups");
+        const groups = Array.isArray(data.groups) ? data.groups : [];
+        select.innerHTML = `<option value="">Select a group</option>` + groups.map(group =>
+            `<option value="${escapeHTML(group.id)}">${escapeHTML(group.subject)} (${group.participants})</option>`
+        ).join("");
+        if (groups.length) await loadUserProtection(groups[0].id);
+        else document.getElementById("userProtectionGrid").innerHTML = "";
+    } catch (error) {
+        select.innerHTML = `<option value="">Unable to load groups</option>`;
+        const message = document.getElementById("userProtectionMessage");
+        if (message) message.textContent = error.message;
+    }
+}
+
+async function loadUserProtection(groupId) {
+    const grid = document.getElementById("userProtectionGrid");
+    const message = document.getElementById("userProtectionMessage");
+    if (!grid || !groupId) return;
+    try {
+        const data = await userSettingsRequest(`/api/user/groups/${encodeURIComponent(groupId)}/protection`);
+        const protection = data.protection || {};
+        grid.innerHTML = Object.entries(USER_PROTECTION_LABELS).map(([key, info]) => `
+            <div class="feature-card">
+                <div class="feature-info"><div class="feature-icon">${info[0]}</div><div><h3>${escapeHTML(info[1])}</h3><p>${escapeHTML(info[2])}</p></div></div>
+                <label class="switch"><input type="checkbox" data-user-protection="${escapeHTML(key)}" ${protection[key] === true ? "checked" : ""}><span class="slider"></span></label>
+            </div>
+        `).join("");
+        if (message) message.textContent = "Protection settings loaded. Only group admins can change them.";
+
+        grid.querySelectorAll("[data-user-protection]").forEach(input => {
+            input.addEventListener("change", async event => {
+                const key = event.target.dataset.userProtection;
+                try {
+                    await userSettingsRequest(`/api/user/groups/${encodeURIComponent(groupId)}/protection`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ key, enabled: event.target.checked })
+                    });
+                    showToast(`${USER_PROTECTION_LABELS[key]?.[1] || key} ${event.target.checked ? "enabled" : "disabled"}`, "success");
+                } catch (error) {
+                    event.target.checked = !event.target.checked;
+                    showToast(error.message, "error");
+                }
+            });
+        });
+    } catch (error) {
+        grid.innerHTML = "";
+        if (message) message.textContent = error.message;
+    }
+}
+
+async function initializeConnectedUserSettings() {
+    const token = getUserSettingsToken();
+    const storedNumber = sessionStorage.getItem("dripQueenUserSettingsNumber") || "";
+    const phone = document.getElementById("userSettingsPhone");
+    if (phone && storedNumber) phone.value = storedNumber;
+
+    if (!token) {
+        showUserSettingsLogin();
+        return;
+    }
+
+    try {
+        await userSettingsRequest("/api/user/me");
+        showUserSettingsPanel();
+        await loadUserSettings();
+    } catch {
+        clearUserSettingsToken();
+        showUserSettingsLogin();
+    }
+}
+
+function initializeConnectedUserSettingsControls() {
+    const loginForm = document.getElementById("userSettingsLoginForm");
+    if (loginForm && loginForm.dataset.bound !== "true") {
+        loginForm.dataset.bound = "true";
+        loginForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            const phone = normalizeSettingsPhone(document.getElementById("userSettingsPhone")?.value);
+            const passwordInput = document.getElementById("userSettingsPassword");
+            const password = passwordInput?.value || "";
+            const errorBox = document.getElementById("userSettingsLoginError");
+            if (errorBox) { errorBox.classList.add("hidden"); errorBox.textContent = ""; }
+            try {
+                await connectedUserLogin(phone, password);
+                if (passwordInput) passwordInput.value = "";
+                showUserSettingsPanel();
+                await loadUserSettings();
+                showToast("Connected-user settings unlocked", "success");
+            } catch (error) {
+                clearUserSettingsToken();
+                if (errorBox) { errorBox.textContent = error.message; errorBox.classList.remove("hidden"); }
+                // Never expose or auto-fill the real password after a failed login.
+                if (passwordInput) passwordInput.value = "";
+            }
+        });
+    }
+
+    const configForm = document.getElementById("userSettingsConfigForm");
+    if (configForm && configForm.dataset.bound !== "true") {
+        configForm.dataset.bound = "true";
+        configForm.addEventListener("submit", async event => {
+            event.preventDefault();
+            const prefix = document.getElementById("userSettingPrefix")?.value.trim();
+            const mode = document.getElementById("userSettingMode")?.value.toLowerCase();
+            try {
+                await userSettingsRequest("/api/user/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ prefix, mode })
+                });
+                showToast("Configuration saved", "success");
+                await loadUserSettings();
+            } catch (error) {
+                showToast(error.message, "error");
+            }
+        });
+    }
+
+    const logoutButton = document.getElementById("userSettingsLogout");
+    if (logoutButton && logoutButton.dataset.bound !== "true") {
+        logoutButton.dataset.bound = "true";
+        logoutButton.addEventListener("click", () => {
+            clearUserSettingsToken();
+            sessionStorage.removeItem("dripQueenUserSettingsNumber");
+            showUserSettingsLogin();
+            showToast("Settings locked", "success");
+        });
+    }
+
+    const refreshGroups = document.getElementById("refreshUserGroups");
+    if (refreshGroups && refreshGroups.dataset.bound !== "true") {
+        refreshGroups.dataset.bound = "true";
+        refreshGroups.addEventListener("click", () => loadUserGroups());
+    }
+
+    const groupSelect = document.getElementById("userSettingsGroup");
+    if (groupSelect && groupSelect.dataset.bound !== "true") {
+        groupSelect.dataset.bound = "true";
+        groupSelect.addEventListener("change", event => loadUserProtection(event.target.value));
+    }
+}
+
+/* ==========================================
    SETTINGS
 ========================================== */
 
@@ -668,7 +945,7 @@ function initializeNavigation() {
             if (sidebar) sidebar.classList.remove("show");
             if (target === "admin") initializeAdmin();
             if (target === "commands") loadCommands();
-                if (target === "autofeatures") loadFeatures();
+                if (target === "autofeatures") { initializeConnectedUserSettingsControls(); initializeConnectedUserSettings(); }
             if (target === "settings") loadSettings();
         });
     }
@@ -794,9 +1071,7 @@ function initializeButtons() {
 async function refreshDashboard(showMessage = false) {
     const results = await Promise.allSettled([
         loadStatus(),
-        loadCommands(),
-        loadFeatures(),
-        loadSettings()
+        loadCommands()
     ]);
 
     const failed = results.filter(result => result.status === "rejected");
@@ -820,6 +1095,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeButtons();
     initializeFeatureControls();
     initializeSettingsControls();
+    initializeConnectedUserSettingsControls();
     initializeCommandSearch();
 
     // Never block the UI on an API call.

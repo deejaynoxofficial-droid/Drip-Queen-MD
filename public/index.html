@@ -129,10 +129,10 @@
                     class="nav-item"
                     data-page="autofeatures"
                 >
-                    <span class="nav-icon">⚡</span>
+                    <span class="nav-icon">⚙️</span>
 
                     <span>
-                        Auto Features
+                        Settings
                     </span>
                 </button>
 
@@ -159,16 +159,6 @@
                     </span>
                 </button>
 
-                <button
-                    class="nav-item"
-                    data-page="settings"
-                >
-                    <span class="nav-icon">⚙️</span>
-
-                    <span>
-                        Settings
-                    </span>
-                </button>
 
             </nav>
 
@@ -463,11 +453,11 @@
                             </span>
 
                             <strong>
-                                Auto Features
+                                Settings
                             </strong>
 
                             <small>
-                                Configure Automation
+                                Manage Bot Settings
                             </small>
 
                         </button>
@@ -731,352 +721,77 @@
                 class="page"
             >
 
-                <div class="section-card">
-
+                <div class="section-card settings-auth-card" id="userSettingsLoginCard">
                     <div class="section-header">
-
                         <div>
-
-                            <h2>
-                                ⚡ Auto Features
-                            </h2>
-
-                            <p>
-                                Enable or disable automated
-                                bot features.
-                            </p>
-
+                            <h2>🔐 Connected User Settings</h2>
+                            <p>Only a WhatsApp number with a saved bot session and its individual dashboard password can enter this page.</p>
                         </div>
-
                     </div>
 
-
-                    <div
-                        id="autoFeaturesList"
-                        class="features-grid"
-                    >
-
-
-                        <!-- ANTI LINK -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    🔗
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Anti Link
-                                    </h3>
-
-                                    <p>
-                                        Detect and manage
-                                        unwanted links.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="antiLink"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
+                    <form id="userSettingsLoginForm" class="settings-auth-form">
+                        <div class="input-group">
+                            <label for="userSettingsPhone">WhatsApp Number</label>
+                            <input id="userSettingsPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Country code + number" required>
                         </div>
-
-
-                        <!-- ANTI DELETE -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    🗑️
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Anti Delete
-                                    </h3>
-
-                                    <p>
-                                        Save deleted messages
-                                        when supported.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="antiDelete"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
+                        <div class="input-group">
+                            <label for="userSettingsPassword">Dashboard Password</label>
+                            <input id="userSettingsPassword" type="password" autocomplete="current-password" placeholder="Password from .settings" required>
                         </div>
+                        <button class="primary-btn" type="submit">🔓 Enter Settings</button>
+                    </form>
+                    <div id="userSettingsLoginError" class="error-box hidden"></div>
+                    <p class="settings-security-note">🔒 If a password is entered incorrectly, the real password is not revealed by the webpage. Run <strong>.settings</strong> from the connected WhatsApp account to view the individual password again.</p>
+                </div>
 
-
-                        <!-- AUTO REACT -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    ❤️
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Auto React
-                                    </h3>
-
-                                    <p>
-                                        Automatically react
-                                        to incoming messages.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="autoReact"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
+                <div class="settings-dashboard hidden" id="userSettingsPanel">
+                    <div class="section-card settings-dashboard-header">
+                        <div>
+                            <span class="welcome-badge">🔐 CONNECTED USER</span>
+                            <h2>⚙️ DRIP QUEEN MD Settings</h2>
+                            <p>Manage the same editable settings available through <strong>.settings</strong>.</p>
                         </div>
-
-
-                        <!-- AUTO REPLY -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    💬
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Auto Reply
-                                    </h3>
-
-                                    <p>
-                                        Automatically reply
-                                        to configured messages.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="autoReply"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
+                        <div class="settings-user-actions">
+                            <strong id="userSettingsIdentity">—</strong>
+                            <button id="userSettingsLogout" class="secondary-btn" type="button">Log out</button>
                         </div>
-
-
-                        <!-- AUTO TYPING -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    ⌨️
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Auto Typing
-                                    </h3>
-
-                                    <p>
-                                        Show typing presence
-                                        automatically.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="autoTyping"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
-                        </div>
-
-
-                        <!-- AUTO RECORDING -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    🎙️
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Auto Recording
-                                    </h3>
-
-                                    <p>
-                                        Show recording presence
-                                        automatically.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="autoRecording"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
-                        </div>
-
-
-                        <!-- WELCOME -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    👋
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Welcome Messages
-                                    </h3>
-
-                                    <p>
-                                        Welcome new group members.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="welcome"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
-                        </div>
-
-
-                        <!-- GOODBYE -->
-
-                        <div class="feature-card">
-
-                            <div class="feature-info">
-
-                                <div class="feature-icon">
-                                    🚪
-                                </div>
-
-                                <div>
-
-                                    <h3>
-                                        Goodbye Messages
-                                    </h3>
-
-                                    <p>
-                                        Send messages when users leave.
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-
-                            <label class="switch">
-
-                                <input
-                                    type="checkbox"
-                                    data-feature="goodbye"
-                                >
-
-                                <span class="slider"></span>
-
-                            </label>
-
-                        </div>
-
-
                     </div>
 
+                    <div class="settings-grid">
+                        <div class="section-card">
+                            <div class="section-header"><div><h2>🤖 Bot Information</h2><p>Read-only bot identity.</p></div></div>
+                            <div class="settings-info">
+                                <div class="setting-row"><span>Bot Name</span><strong id="userSettingBotName">DRIP QUEEN MD</strong></div>
+                                <div class="setting-row"><span>Version</span><strong id="userSettingVersion">1.0.0</strong></div>
+                                <div class="setting-row"><span>Creator</span><strong id="userSettingCreator">NOX STAR TECH</strong></div>
+                                <div class="setting-row"><span>Connected Number</span><strong id="userSettingNumber">—</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="section-header"><div><h2>🛠️ Editable Configuration</h2><p>These are the editable global bot settings.</p></div></div>
+                            <form id="userSettingsConfigForm" class="settings-info">
+                                <div class="input-group"><label for="userSettingPrefix">Command Prefix</label><input id="userSettingPrefix" type="text" maxlength="3" placeholder="."></div>
+                                <div class="input-group"><label for="userSettingMode">Mode</label><select id="userSettingMode"><option value="public">PUBLIC</option><option value="private">PRIVATE</option></select></div>
+                                <button class="primary-btn" type="submit">💾 Save Configuration</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-header"><div><h2>⚡ Auto Features</h2><p>All automatic features defined by the bot settings system.</p></div></div>
+                        <div id="userAutoFeaturesGrid" class="features-grid"></div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="section-header"><div><h2>🛡️ Group Protection</h2><p>Select a group you administer, then manage its protection settings.</p></div></div>
+                        <div class="group-settings-toolbar">
+                            <div class="input-group"><label for="userSettingsGroup">Group</label><select id="userSettingsGroup"><option value="">Select a group</option></select></div>
+                            <button id="refreshUserGroups" class="secondary-btn" type="button">↻ Refresh Groups</button>
+                        </div>
+                        <div id="userProtectionGrid" class="features-grid"></div>
+                        <div id="userProtectionMessage" class="settings-security-note">Select a group to load its protection status.</div>
+                    </div>
                 </div>
 
             </section>
@@ -1230,255 +945,6 @@
                     </div>
                 </div>
             </section>
-
-            <!-- ============================= -->
-            <!-- SETTINGS PAGE -->
-            <!-- ============================= -->
-
-            <section
-                id="settings"
-                class="page"
-            >
-
-                <div class="settings-grid">
-
-
-                    <!-- BOT INFORMATION -->
-
-                    <div class="section-card">
-
-                        <div class="section-header">
-
-                            <div>
-
-                                <h2>
-                                    🤖 Bot Information
-                                </h2>
-
-                                <p>
-                                    Current bot configuration.
-                                </p>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="settings-info">
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Bot Name
-                                </span>
-
-                                <strong
-                                    id="settingBotName"
-                                >
-                                    DRIP QUEEN MD
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Version
-                                </span>
-
-                                <strong
-                                    id="settingVersion"
-                                >
-                                    1.0.0
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Creator
-                                </span>
-
-                                <strong
-                                    id="settingCreator"
-                                >
-                                    NOX STAR TECH
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Prefix
-                                </span>
-
-                                <strong
-                                    id="settingPrefix"
-                                >
-                                    .
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Mode
-                                </span>
-
-                                <strong
-                                    id="settingMode"
-                                >
-                                    PUBLIC
-                                </strong>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <!-- EDIT BOT SETTINGS -->
-
-                    <div class="section-card">
-                        <div class="section-header">
-                            <div>
-                                <h2>🛠️ Edit Bot Settings</h2>
-                                <p>Changes are saved through the bot API.</p>
-                            </div>
-                        </div>
-
-                        <form id="settingsForm" class="settings-info">
-                            <div class="input-group">
-                                <label for="botNameInput">Bot Name</label>
-                                <input
-                                    id="botNameInput"
-                                    type="text"
-                                    maxlength="60"
-                                    placeholder="DRIP QUEEN MD"
-                                >
-                            </div>
-
-                            <div class="input-group">
-                                <label for="prefixInput">Command Prefix</label>
-                                <input
-                                    id="prefixInput"
-                                    type="text"
-                                    maxlength="5"
-                                    placeholder="."
-                                >
-                            </div>
-
-                            <div class="input-group">
-                                <label for="modeInput">Mode</label>
-                                <select id="modeInput">
-                                    <option value="PUBLIC">PUBLIC</option>
-                                    <option value="PRIVATE">PRIVATE</option>
-                                </select>
-                            </div>
-
-                            <button class="btn-primary" type="submit">
-                                💾 Save Settings
-                            </button>
-                        </form>
-                    </div>
-
-
-                    <!-- SYSTEM INFORMATION -->
-
-                    <div class="section-card">
-
-                        <div class="section-header">
-
-                            <div>
-
-                                <h2>
-                                    💻 System Information
-                                </h2>
-
-                                <p>
-                                    Server and application status.
-                                </p>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="settings-info">
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Node.js
-                                </span>
-
-                                <strong
-                                    id="nodeVersion"
-                                >
-                                    Loading...
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Platform
-                                </span>
-
-                                <strong
-                                    id="platform"
-                                >
-                                    Loading...
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Database
-                                </span>
-
-                                <strong
-                                    id="databaseStatus"
-                                >
-                                    Checking...
-                                </strong>
-
-                            </div>
-
-
-                            <div class="setting-row">
-
-                                <span>
-                                    Dashboard
-                                </span>
-
-                                <strong>
-                                    🟢 Active
-                                </strong>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </section>
-
 
             <!-- ============================= -->
             <!-- FOOTER -->
