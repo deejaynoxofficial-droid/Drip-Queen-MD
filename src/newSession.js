@@ -324,7 +324,7 @@ async function sendWelcomeMessage(userId, sock) {
             return false;
         }
 
-        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
+        const creatorNames = config.CREATORS || "> NOX STAR TECH";
         const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
         const prefix = config.PREFIX || ".";
         const displayName = String(
