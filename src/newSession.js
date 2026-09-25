@@ -58,6 +58,7 @@ async function loadBaileys() {
 const pino = require("pino");
 
 const config = require("../config");
+const { ensureUserDashboardPassword } = require("../lib/dashboardAuth");
 
 // Numeric menu reply sessions (e.g. reply "1" after .menu)
 let menuSessionStore = null;
@@ -186,6 +187,89 @@ function getWelcomeMarkerPath(userId) {
 
 
 const welcomeTimers = new Map();
+const channelPromotionTimers = new Map();
+
+function scheduleChannelPromotion(userId, sock, target, delayMs = 30000) {
+    if (!userId || !sock || !target) return;
+
+    if (channelPromotionTimers.has(userId)) {
+        console.log(`[CHANNEL PROMOTION] Already scheduled for ${userId}`);
+        return;
+    }
+
+    console.log(`[CHANNEL PROMOTION] Scheduling for ${userId} in ${delayMs}ms`);
+
+    const timer = setTimeout(async () => {
+        channelPromotionTimers.delete(userId);
+
+        try {
+            const markerPath = getWelcomeMarkerPath(userId);
+            let marker = {};
+
+            try {
+                if (fs.existsSync(markerPath)) {
+                    marker = JSON.parse(fs.readFileSync(markerPath, "utf8")) || {};
+                }
+            } catch {}
+
+            if (marker.channelPromotionSentAt) {
+                console.log(`[CHANNEL PROMOTION] Already sent for ${userId}`);
+                return;
+            }
+
+            const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
+            const botImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
+            const thumbnailPath = path.isAbsolute(botImage)
+                ? botImage
+                : path.join(config.ROOT_DIR, botImage);
+
+            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃       📢 DRIP QUEEN CHANNEL   ┃
+┃                              ┃
+┃   👑 Stay connected with     ┃
+┃      DRIP QUEEN MD           ┃
+┃                              ┃
+┃   ✨ New updates              ┃
+┃   ⚡ Features & releases     ┃
+┃   📣 Official announcements  ┃
+┃                              ┃
+┃   👉 Follow the official     ┃
+┃      WhatsApp Channel       ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+
+            const message = {
+                text: `${caption}\n\n${channel}`,
+                contextInfo: {
+                    externalAdReply: {
+                        title: "👑 DRIP QUEEN MD — Official Channel",
+                        body: "Updates • Features • Announcements",
+                        mediaType: 1,
+                        renderLargerThumbnail: true,
+                        showAdAttribution: false,
+                        sourceUrl: channel,
+                    }
+                }
+            };
+
+            if (fs.existsSync(thumbnailPath)) {
+                message.contextInfo.externalAdReply.thumbnail = fs.readFileSync(thumbnailPath);
+            }
+
+            await sock.sendMessage(target, message);
+
+            marker.channelPromotionSentAt = new Date().toISOString();
+            marker.channelPromotionVersion = "channel-promotion-v1";
+            fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+            fs.writeFileSync(markerPath, JSON.stringify(marker, null, 2), "utf8");
+
+            console.log(`[CHANNEL PROMOTION] Sent successfully to ${target} for ${userId}`);
+        } catch (error) {
+            console.error(`[CHANNEL PROMOTION ERROR] ${userId}:`, error.stack || error.message);
+        }
+    }, delayMs);
+
+    channelPromotionTimers.set(userId, timer);
+}
 
 function scheduleWelcomeMessage(userId, sock) {
     if (!userId || !sock) return;
@@ -223,6 +307,20 @@ async function sendWelcomeMessage(userId, sock) {
 
         if (marker?.version === WELCOME_VERSION) {
             console.log(`[WELCOME] Already sent for ${userId}`);
+
+            const existingTarget = (() => {
+                try {
+                    const normalized = jidNormalizedUser(sock.user.id);
+                    return normalized || sock.user.id;
+                } catch {
+                    return sock.user.id;
+                }
+            })();
+
+            if (!marker.channelPromotionSentAt) {
+                scheduleChannelPromotion(userId, sock, existingTarget, 30000);
+            }
+
             return false;
         }
 
@@ -311,6 +409,11 @@ async function sendWelcomeMessage(userId, sock) {
                         ptt: false
                     });
                     console.log(`[WELCOME AUDIO] Sent successfully to ${target} for ${userId}`);
+
+                    // Keep the existing welcome image/text and audio unchanged.
+                    // The official channel promotion is sent separately 30 seconds
+                    // after the welcome + audio have both been delivered.
+                    scheduleChannelPromotion(userId, sock, target, 30000);
 
                     sent = true;
                     console.log(`[WELCOME] Sent successfully to ${target} for ${userId}`);
@@ -703,6 +806,11 @@ async function connectSession(userId) {
                         sock
                     );
 
+                    try {
+                        ensureUserDashboardPassword(userId);
+                    } catch (authError) {
+                        console.error(`[DASHBOARD PASSWORD] ${userId}:`, authError.message);
+                    }
 
                     console.log(
                         `[SESSION CONNECTED] ${userId}`
@@ -1835,6 +1943,16 @@ async function restoreSessions() {
 
 
 /* ==========================================
+   GET ACTIVE SESSION SOCKET
+========================================== */
+
+function getSessionSocket(userId) {
+    const normalized = String(userId || "").replace(/\D/g, "");
+    return normalized ? (activeSessions.get(normalized) || null) : null;
+}
+
+
+/* ==========================================
    GET ACTIVE SESSIONS
 ========================================== */
 
@@ -2368,6 +2486,8 @@ module.exports = {
 
 
     getSessions,
+
+    getSessionSocket,
 
     getActiveSessions:
         getSessions,
