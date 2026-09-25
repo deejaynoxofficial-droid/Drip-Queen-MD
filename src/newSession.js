@@ -61,6 +61,8 @@ const pino = require("pino");
 
 const config = require("../config");
 const { ensureUserDashboardPassword } = require("../lib/dashboardAuth");
+const { getSettings: getUserAutoSettings } = require("../lib/autoSettings");
+const { getBotSettings: getUserBotSettings } = require("../lib/botSettings");
 
 // Numeric menu reply sessions (e.g. reply "1" after .menu)
 let menuSessionStore = null;
@@ -166,56 +168,13 @@ const pairingRequests = new Set();
    SAFE SETTINGS LOADER
 ========================================== */
 
-function getFeatureSettings() {
-
+function getFeatureSettings(userId) {
     try {
-
-        const settingsPath =
-            config.SETTINGS_DB;
-
-
-        if (
-            !settingsPath ||
-            !fs.existsSync(settingsPath)
-        ) {
-
-            return {};
-
-        }
-
-
-        const content =
-            fs.readFileSync(
-                settingsPath,
-                "utf8"
-            );
-
-
-        if (!content.trim()) {
-
-            return {};
-
-        }
-
-
-        const settings =
-            JSON.parse(content);
-
-
-        return settings.features || {};
-
-
+        return getUserAutoSettings(userId);
     } catch (error) {
-
-        console.error(
-            "[SETTINGS READ ERROR]",
-            error.message
-        );
-
+        console.error("[SETTINGS READ ERROR]", error.message);
         return {};
-
     }
-
 }
 
 
@@ -291,19 +250,19 @@ function scheduleChannelPromotion(userId, sock, target, delayMs = 30000) {
                 ? botImage
                 : path.join(config.ROOT_DIR, botImage);
 
-            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃       📢 DRIP QUEEN CHANNEL   
-┃                              
-┃   👑 Stay connected with     
-┃      DRIP QUEEN MD           
-┃                              
-┃   ✨ New updates              
-┃   ⚡ Features & releases     
-┃   📣 Official announcements  
-┃                              
-┃   👉 Follow the official     
-┃      WhatsApp Channel       
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃       📢 DRIP QUEEN CHANNEL   ┃
+┃                              ┃
+┃   👑 Stay connected with     ┃
+┃      DRIP QUEEN MD           ┃
+┃                              ┃
+┃   ✨ New updates              ┃
+┃   ⚡ Features & releases     ┃
+┃   📣 Official announcements  ┃
+┃                              ┃
+┃   👉 Follow the official     ┃
+┃      WhatsApp Channel       ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
             const message = {
                 text: `${caption}\n\n${channel}`,
@@ -392,7 +351,7 @@ async function sendWelcomeMessage(userId, sock) {
             return false;
         }
 
-        const creatorNames = config.CREATORS || "> NOX STAR TECH";
+        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
         const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
         const prefix = config.PREFIX || ".";
         const displayName = String(
@@ -402,7 +361,7 @@ async function sendWelcomeMessage(userId, sock) {
             "there"
         ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot1.png");
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
@@ -411,25 +370,25 @@ async function sendWelcomeMessage(userId, sock) {
 
         console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃        👑 DRIP QUEEN MD      
-┃                              
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 DRIP QUEEN MD      ┃
+┃                              ┃
 ┃      ✨ Welcome, ${displayName}!
-┃                              
-┃   🤖 Your WhatsApp bot is   
-┃      now connected.          
-┃                              
-┃   ⚡ Mode    : Public        
-┃   🔹 Prefix  : ${prefix}             
-┃   📦 Version : 1.0.0            
-┃                              
-┃   💎 Type ${prefix}menu to explore.
-┃                              
-┃   📢 Official Channel        
+┃                              ┃
+┃   🤖 Your WhatsApp bot is   ┃
+┃      now connected.          ┃
+┃                              ┃
+┃   ⚡ Mode    : Public        ┃
+┃   🔹 Prefix  : ${prefix}             ┃
+┃   📦 Version : 1             ┃
+┃                              ┃
+┃   💎 Type ${prefix}menu to explore ┃
+┃                              ┃
+┃   📢 Official Channel        ┃
 ┃   ${channel}
-┃                              
-┃       👑 ${creatorNames}      
-╰━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+┃                              ┃
+┃       👑 ${creatorNames}      ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
         const addTarget = value => {
@@ -1208,7 +1167,7 @@ async function handleMessages(
 
 
             // Cache the original before any command/auto-feature processing.
-            if (getFeatureSettings().antiDelete === true) {
+            if (getFeatureSettings(userId).antiDelete === true) {
                 cacheIncomingMessage(userId, msg);
             }
 
@@ -1227,7 +1186,8 @@ async function handleMessages(
                 await handleAutoFeatures(
                     sock,
                     msg,
-                    text
+                    text,
+                    userId
                 );
             }
 
@@ -1468,9 +1428,11 @@ async function handleCommand(
     let commandName = "unknown";
 
     try {
-        const configuredPrefixes = Array.isArray(config.PREFIXES)
-            ? config.PREFIXES
-            : [config.PREFIX || "."];
+        const userBotSettings = getUserBotSettings(userId);
+        const configuredPrefixes = [
+            userBotSettings.prefix,
+            ...(Array.isArray(config.PREFIXES) ? config.PREFIXES : [config.PREFIX || "."])
+        ];
 
         const prefixes = [...new Set(
             configuredPrefixes
@@ -1764,7 +1726,7 @@ async function handleMessageRevoke(sock, userId, item) {
 
         if (!chatId || !messageId) return false;
 
-        const features = getFeatureSettings();
+        const features = getFeatureSettings(userId);
         if (features.antiDelete !== true) return false;
 
         // Never restore a message that was sent by the linked account.
@@ -1941,13 +1903,14 @@ function hasRecoverableMedia(message) {
 async function handleAutoFeatures(
     sock,
     msg,
-    text
+    text,
+    userId
 ) {
 
     try {
 
         const features =
-            getFeatureSettings();
+            getFeatureSettings(userId);
 
 
         const chatId =
