@@ -2330,6 +2330,104 @@ input.pair-code::placeholder {
 
 
 /* ==========================================
+   CONNECTED USER SETTINGS - DARK FIELDS
+========================================== */
+
+.settings-auth-form input,
+.settings-dashboard input,
+.settings-dashboard select,
+.settings-dashboard textarea,
+.group-settings-toolbar select {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 15px;
+    border-radius: 13px;
+    border: 1px solid rgba(139, 92, 246, 0.28);
+    background: rgba(10, 12, 30, 0.72);
+    color: var(--text-primary);
+    color-scheme: dark;
+    outline: none;
+    transition: var(--transition);
+    box-sizing: border-box;
+}
+
+.settings-auth-form input::placeholder,
+.settings-dashboard input::placeholder {
+    color: var(--text-muted);
+}
+
+.settings-auth-form input:focus,
+.settings-dashboard input:focus,
+.settings-dashboard select:focus,
+.settings-dashboard textarea:focus,
+.group-settings-toolbar select:focus {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
+    background: rgba(15, 18, 40, 0.9);
+}
+
+.settings-dashboard select option,
+.group-settings-toolbar select option {
+    background: #111326;
+    color: #fff;
+}
+
+/* Group protection action buttons */
+.protection-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.protection-action {
+    min-width: 58px;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.045);
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    transition: var(--transition);
+}
+
+.protection-action:hover {
+    transform: translateY(-1px);
+    border-color: rgba(139,92,246,.45);
+}
+
+.protection-action.in.active {
+    background: rgba(34,197,94,.16);
+    border-color: rgba(34,197,94,.55);
+    color: #86efac;
+}
+
+.protection-action.out.active {
+    background: rgba(239,68,68,.16);
+    border-color: rgba(239,68,68,.55);
+    color: #fca5a5;
+}
+
+.protection-status {
+    margin-top: 7px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 520px) {
+    .protection-actions {
+        width: 100%;
+    }
+
+    .protection-action {
+        flex: 1;
+    }
+}
+
+/* ==========================================
    CREATOR ADMIN DASHBOARD
 ========================================== */
 

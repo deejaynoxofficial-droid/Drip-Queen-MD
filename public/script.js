@@ -710,26 +710,48 @@ async function loadUserProtection(groupId) {
     try {
         const data = await userSettingsRequest(`/api/user/groups/${encodeURIComponent(groupId)}/protection`);
         const protection = data.protection || {};
-        grid.innerHTML = Object.entries(USER_PROTECTION_LABELS).map(([key, info]) => `
-            <div class="feature-card">
-                <div class="feature-info"><div class="feature-icon">${info[0]}</div><div><h3>${escapeHTML(info[1])}</h3><p>${escapeHTML(info[2])}</p></div></div>
-                <label class="switch"><input type="checkbox" data-user-protection="${escapeHTML(key)}" ${protection[key] === true ? "checked" : ""}><span class="slider"></span></label>
-            </div>
-        `).join("");
-        if (message) message.textContent = "Protection settings loaded. Only group admins can change them.";
+        grid.innerHTML = Object.entries(USER_PROTECTION_LABELS).map(([key, info]) => {
+            const enabled = protection[key] === true;
+            return `
+            <div class="feature-card protection-card">
+                <div class="feature-info">
+                    <div class="feature-icon">${info[0]}</div>
+                    <div>
+                        <h3>${escapeHTML(info[1])}</h3>
+                        <p>${escapeHTML(info[2])}</p>
+                        <div class="protection-status" data-protection-status="${escapeHTML(key)}">${enabled ? "🟢 Active" : "🔴 Deactivated"}</div>
+                    </div>
+                </div>
+                <div class="protection-actions">
+                    <button type="button" class="protection-action in ${enabled ? "active" : ""}" data-protection-key="${escapeHTML(key)}" data-protection-value="true">IN</button>
+                    <button type="button" class="protection-action out ${!enabled ? "active" : ""}" data-protection-key="${escapeHTML(key)}" data-protection-value="false">OUT</button>
+                </div>
+            </div>`;
+        }).join("");
+        if (message) message.textContent = "Protection settings loaded. Use IN to activate or OUT to deactivate. Only group admins can change them.";
 
-        grid.querySelectorAll("[data-user-protection]").forEach(input => {
-            input.addEventListener("change", async event => {
-                const key = event.target.dataset.userProtection;
+        grid.querySelectorAll("[data-protection-key]").forEach(button => {
+            button.addEventListener("click", async event => {
+                const clicked = event.currentTarget;
+                const key = clicked.dataset.protectionKey;
+                const enabled = clicked.dataset.protectionValue === "true";
+                const buttons = grid.querySelectorAll(`[data-protection-key="${CSS.escape(key)}"]`);
+                buttons.forEach(item => item.disabled = true);
                 try {
                     await userSettingsRequest(`/api/user/groups/${encodeURIComponent(groupId)}/protection`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ key, enabled: event.target.checked })
+                        body: JSON.stringify({ key, enabled })
                     });
-                    showToast(`${USER_PROTECTION_LABELS[key]?.[1] || key} ${event.target.checked ? "enabled" : "disabled"}`, "success");
+                    buttons.forEach(item => {
+                        item.disabled = false;
+                        item.classList.toggle("active", item.dataset.protectionValue === String(enabled));
+                    });
+                    const status = grid.querySelector(`[data-protection-status="${CSS.escape(key)}"]`);
+                    if (status) status.textContent = enabled ? "🟢 Active" : "🔴 Deactivated";
+                    showToast(`${USER_PROTECTION_LABELS[key]?.[1] || key} ${enabled ? "activated" : "deactivated"}`, "success");
                 } catch (error) {
-                    event.target.checked = !event.target.checked;
+                    buttons.forEach(item => item.disabled = false);
                     showToast(error.message, "error");
                 }
             });

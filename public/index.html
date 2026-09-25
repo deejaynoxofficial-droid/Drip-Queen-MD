@@ -725,7 +725,7 @@
                     <div class="section-header">
                         <div>
                             <h2>🔐 Connected User Settings</h2>
-                            <p>Only a WhatsApp number with a saved bot session and its individual dashboard password can enter this page.</p>
+                            <p>Only a WhatsApp number with a saved bot session and its individual 6-digit dashboard code can enter this page.</p>
                         </div>
                     </div>
 
@@ -735,13 +735,13 @@
                             <input id="userSettingsPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Country code + number" required>
                         </div>
                         <div class="input-group">
-                            <label for="userSettingsPassword">Dashboard Password</label>
-                            <input id="userSettingsPassword" type="password" autocomplete="current-password" placeholder="Password from .settings" required>
+                            <label for="userSettingsPassword">6-Digit Dashboard Code</label>
+                            <input id="userSettingsPassword" type="password" inputmode="numeric" pattern="\d{6}" minlength="6" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code from .settings" required>
                         </div>
                         <button class="primary-btn" type="submit">🔓 Enter Settings</button>
                     </form>
                     <div id="userSettingsLoginError" class="error-box hidden"></div>
-                    <p class="settings-security-note">🔒 If a password is entered incorrectly, the real password is not revealed by the webpage. Run <strong>.settings</strong> from the connected WhatsApp account to view the individual password again.</p>
+                    <p class="settings-security-note">🔒 If a code is entered incorrectly, the real code is not revealed by the webpage. Run <strong>.settings</strong> from the connected WhatsApp account to view the individual 6-digit code again.</p>
                 </div>
 
                 <div class="settings-dashboard hidden" id="userSettingsPanel">
@@ -784,7 +784,7 @@
                     </div>
 
                     <div class="section-card">
-                        <div class="section-header"><div><h2>🛡️ Group Protection</h2><p>Select a group you administer, then manage its protection settings.</p></div></div>
+                        <div class="section-header"><div><h2>🛡️ Group Protection</h2><p>Select a group you administer, then use IN to activate or OUT to deactivate each protection.</p></div></div>
                         <div class="group-settings-toolbar">
                             <div class="input-group"><label for="userSettingsGroup">Group</label><select id="userSettingsGroup"><option value="">Select a group</option></select></div>
                             <button id="refreshUserGroups" class="secondary-btn" type="button">↻ Refresh Groups</button>
