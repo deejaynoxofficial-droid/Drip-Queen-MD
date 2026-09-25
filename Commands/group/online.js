@@ -134,7 +134,7 @@ module.exports = {
 
                 // Presence replies are asynchronous. Give WhatsApp enough time
                 // to send the initial state for subscribed members.
-                await delay(3500);
+                await delay(6000);
             } finally {
                 try {
                     sock.ev.off("presence.update", onPresence);
