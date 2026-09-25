@@ -12,6 +12,7 @@ const {
 } = require("../lib/dashboardAuth");
 const { defaults: PROTECTION_DEFAULTS, get: getGroupProtection, set: setGroupProtection } = require("../lib/groupProtection");
 const { getBotSettings, updateBotSetting } = require("../lib/botSettings");
+const { getSettings: getUserAutoSettings, updateSetting: updateUserAutoSetting, DEFAULT_SETTINGS: USER_FEATURE_DEFAULTS } = require("../lib/autoSettings");
 
 /*
    Optional persistent bot worker URL.
@@ -442,8 +443,8 @@ function createDashboard(app) {
                 }
                 const user = authenticateUserRequest(req, res);
                 if (!user) return;
-                const bot = getBotSettings();
-                res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION, creator: config.CREATOR, botName: config.BOT_NAME }, features: getFeatureSettings(), protectionKeys: PROTECTION_DEFAULTS });
+                const bot = getBotSettings(user.userId);
+                res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION, creator: config.CREATOR, botName: config.BOT_NAME }, features: getUserAutoSettings(user.userId), protectionKeys: PROTECTION_DEFAULTS });
             } catch (error) {
                 res.status(500).json({ success: false, error: error.message || "Failed to load user settings." });
             }
@@ -464,17 +465,17 @@ function createDashboard(app) {
                 const user = authenticateUserRequest(req, res);
                 if (!user) return;
                 const body = req.body || {};
-                if (typeof body.prefix === "string") updateBotSetting("prefix", body.prefix.trim());
-                if (typeof body.mode === "string" && ["public", "private"].includes(body.mode.toLowerCase())) updateBotSetting("mode", body.mode.toLowerCase());
+                if (typeof body.prefix === "string") updateBotSetting("prefix", body.prefix.trim(), user.userId);
+                if (typeof body.mode === "string" && ["public", "private"].includes(body.mode.toLowerCase())) updateBotSetting("mode", body.mode.toLowerCase(), user.userId);
                 if (body.features && typeof body.features === "object") {
-                    const current = getFeatureSettings();
                     for (const [key, value] of Object.entries(body.features)) {
-                        if (Object.prototype.hasOwnProperty.call(DEFAULT_FEATURES, key) && typeof value === "boolean") current[key] = value;
+                        if (Object.prototype.hasOwnProperty.call(USER_FEATURE_DEFAULTS, key) && typeof value === "boolean") {
+                            updateUserAutoSetting(key, value, user.userId);
+                        }
                     }
-                    saveFeatureSettings(current);
                 }
-                const bot = getBotSettings();
-                return res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION }, features: getFeatureSettings(), protectionKeys: PROTECTION_DEFAULTS });
+                const bot = getBotSettings(user.userId);
+                return res.json({ success: true, userId: user.userId, bot: { ...bot, version: config.BOT_VERSION, creator: config.CREATOR, botName: config.BOT_NAME }, features: getUserAutoSettings(user.userId), protectionKeys: PROTECTION_DEFAULTS });
             } catch (error) {
                 res.status(500).json({ success: false, error: error.message || "Failed to save user settings." });
             }
