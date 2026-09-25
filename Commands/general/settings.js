@@ -153,8 +153,8 @@ function renderSettings(context = {}) {
 
 ╭─〔 🔐 DASHBOARD ACCESS 〕
 │ 📱 Connected User : ${context.userId || "Unknown"}
-│ 🔑 Dashboard Password : *${dashboardPassword}*
-│ 🌐 Use this number + password on the
+│ 🔢 Dashboard Code (6 digits) : *${dashboardPassword}*
+│ 🌐 Use this number + code on the
 │    dashboard Settings page.
 ╰──────────────────────────────
 
