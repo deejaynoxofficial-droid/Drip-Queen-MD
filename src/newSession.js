@@ -291,19 +291,19 @@ function scheduleChannelPromotion(userId, sock, target, delayMs = 30000) {
                 ? botImage
                 : path.join(config.ROOT_DIR, botImage);
 
-            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃       📢 DRIP QUEEN CHANNEL   ┃
-┃                              ┃
-┃   👑 Stay connected with     ┃
-┃      DRIP QUEEN MD           ┃
-┃                              ┃
-┃   ✨ New updates              ┃
-┃   ⚡ Features & releases     ┃
-┃   📣 Official announcements  ┃
-┃                              ┃
-┃   👉 Follow the official     ┃
-┃      WhatsApp Channel       ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+            const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃       📢 DRIP QUEEN CHANNEL   
+┃                              
+┃   👑 Stay connected with     
+┃      DRIP QUEEN MD           
+┃                              
+┃   ✨ New updates              
+┃   ⚡ Features & releases     
+┃   📣 Official announcements  
+┃                              
+┃   👉 Follow the official     
+┃      WhatsApp Channel       
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
             const message = {
                 text: `${caption}\n\n${channel}`,
@@ -392,7 +392,7 @@ async function sendWelcomeMessage(userId, sock) {
             return false;
         }
 
-        const creatorNames = config.CREATORS || "NOX STAR.B & NOX STAR TECH";
+        const creatorNames = config.CREATORS || "> NOX STAR TECH";
         const channel = config.BOT_CHANNEL || "https://whatsapp.com/channel/0029VbDUfO8IN9iiXeuLYT1y";
         const prefix = config.PREFIX || ".";
         const displayName = String(
@@ -402,7 +402,7 @@ async function sendWelcomeMessage(userId, sock) {
             "there"
         ).trim().replace(/\s+/g, " ").slice(0, 32) || "there";
 
-        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot.png");
+        const configuredImage = config.BOT_IMAGE_PATH || path.join(config.PUBLIC_PATH, "bot1.png");
         const imagePath = path.isAbsolute(configuredImage)
             ? configuredImage
             : path.join(config.ROOT_DIR, configuredImage);
@@ -411,25 +411,25 @@ async function sendWelcomeMessage(userId, sock) {
 
         console.log(`[WELCOME] Build welcome-v2-audio | image=${imagePath} exists=${fs.existsSync(imagePath)} | audio=${audioPath} exists=${fs.existsSync(audioPath)}`);
 
-        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃        👑 DRIP QUEEN MD      ┃
-┃                              ┃
+        const caption = `╭━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 DRIP QUEEN MD      
+┃                              
 ┃      ✨ Welcome, ${displayName}!
-┃                              ┃
-┃   🤖 Your WhatsApp bot is   ┃
-┃      now connected.          ┃
-┃                              ┃
-┃   ⚡ Mode    : Public        ┃
-┃   🔹 Prefix  : ${prefix}             ┃
-┃   📦 Version : 1             ┃
-┃                              ┃
-┃   💎 Type ${prefix}menu to explore ┃
-┃                              ┃
-┃   📢 Official Channel        ┃
+┃                              
+┃   🤖 Your WhatsApp bot is   
+┃      now connected.          
+┃                              
+┃   ⚡ Mode    : Public        
+┃   🔹 Prefix  : ${prefix}             
+┃   📦 Version : 1.0.0            
+┃                              
+┃   💎 Type ${prefix}menu to explore.
+┃                              
+┃   📢 Official Channel        
 ┃   ${channel}
-┃                              ┃
-┃       👑 ${creatorNames}      ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+┃                              
+┃       👑 ${creatorNames}      
+╰━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         const targets = [];
         const addTarget = value => {
