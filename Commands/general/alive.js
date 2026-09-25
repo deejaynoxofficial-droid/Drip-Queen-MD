@@ -13,8 +13,7 @@ module.exports = {
 name: "alive",
 
 aliases: [
-    "status",
-    "online"
+    "status"
 ],
 
 category: "General",

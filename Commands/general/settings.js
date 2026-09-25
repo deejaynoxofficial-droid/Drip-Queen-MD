@@ -13,6 +13,9 @@ const {
     updateBotSetting,
     resetBotSettings
 } = require("../../lib/botSettings");
+const {
+    ensureUserDashboardPassword
+} = require("../../lib/dashboardAuth");
 
 /*
  * Drip Queen MD - Smart Settings Dashboard
@@ -117,9 +120,19 @@ function featureKey(value) {
     return FEATURE_ALIASES[raw] || raw;
 }
 
-function renderSettings() {
+function renderSettings(context = {}) {
     const bot = getBotSettings();
     const auto = getAutoSettings();
+    let dashboardPassword = "Unavailable";
+    try {
+        if (context.isGroup) {
+            dashboardPassword = "Run .settings in your private chat";
+        } else if (context.userId) {
+            dashboardPassword = ensureUserDashboardPassword(context.userId);
+        }
+    } catch (error) {
+        console.warn("[SETTINGS AUTH]", error.message);
+    }
 
     const featureLines = Object.keys(DEFAULT_SETTINGS)
         .map(key => `│ ${FEATURE_LABELS[key] || key} : ${status(auto[key])}`)
@@ -138,6 +151,13 @@ function renderSettings() {
 │ 👑 Creator  : ${bot.creator}
 ╰──────────────────────────────
 
+╭─〔 🔐 DASHBOARD ACCESS 〕
+│ 📱 Connected User : ${context.userId || "Unknown"}
+│ 🔑 Dashboard Password : *${dashboardPassword}*
+│ 🌐 Use this number + password on the
+│    dashboard Settings page.
+╰──────────────────────────────
+
 ╭─〔 🛠️ EDITABLE CONFIG 〕
 │ 🔹 Prefix : ${bot.prefix}
 │ 🌐 Mode   : ${bot.mode}
@@ -145,6 +165,11 @@ function renderSettings() {
 
 ╭─〔 🤖 AUTO FEATURES 〕
 ${featureLines}
+╰──────────────────────────────
+
+╭─〔 🛡️ GROUP PROTECTION 〕
+│ These controls are stored per group.
+${protectionLines}
 ╰──────────────────────────────
 
 ╭─〔 ✏️ HOW TO CHANGE 〕
@@ -179,7 +204,7 @@ function imagePath() {
 }
 
 async function sendDashboard(context) {
-    const caption = renderSettings();
+    const caption = renderSettings(context);
     const img = imagePath();
 
     if (img && typeof context.sendMessage === "function") {
@@ -302,7 +327,7 @@ module.exports = {
                 return changeFeature(feature, args[1], reply);
             }
 
-            return reply(`❌ Unknown settings option.\n\n${renderSettings()}`);
+            return reply(`❌ Unknown settings option.\n\n${renderSettings(context)}`);
         } catch (error) {
             console.error("[SETTINGS COMMAND ERROR]", error.stack || error.message);
             return reply(`❌ Settings error: ${error.message}\n\n${footer()}`);
