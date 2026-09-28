@@ -1,65 +1,235 @@
 const config = require("../../config");
-const { getDownload, downloadBuffer } = require("../../lib/ytApi");
+
+
+/* ==========================================
+   PLAY COMMAND
+========================================== */
 
 module.exports = {
-    name: "play",
-    aliases: ["p", "musicplay"],
-    category: "Download",
-    description: "Search and play music using YT-API",
-    usage: ".play <song name>",
+
+    name:
+        "play",
+
+
+    aliases: [
+
+        "p",
+        "musicplay"
+
+    ],
+
+
+    category:
+        "Download",
+
+
+    description:
+        "Search and play music using a query",
+
+
+    usage:
+        ".play <song name>",
+
 
     async execute(context) {
-        const { sock, msg, args, prefix } = context;
-        const chatId = msg.key.remoteJid;
-        const query = args.join(" ").trim();
+
+        const {
+
+            sock,
+            msg,
+            args,
+            prefix
+
+        } = context;
+
+
+        const chatId =
+            msg.key.remoteJid;
+
+
+        /* ==========================================
+           GET SEARCH QUERY
+        ========================================== */
+
+        const query =
+            args.join(" ").trim();
+
+
+        /* ==========================================
+           VALIDATE QUERY
+        ========================================== */
 
         if (!query) {
-            return await sock.sendMessage(chatId, {
-                text: `╭─〔 🎵 YOUTUBE MP3 〕
+
+            return await sock.sendMessage(
+
+                chatId,
+
+                {
+
+                    text:
+
+`╭─〔 🎧 PLAY MUSIC 〕
 │
-│ Please enter a song or video name.
+│ Please enter a song name.
 │
 │ Example:
 │ ${prefix}play Burna Boy City Boys
 │
+│ More examples:
+│ ${prefix}play Wizkid Essence
+│ ${prefix}play Drake God's Plan
+│
 ╰───────────────`
-            }, { quoted: msg });
+
+                },
+
+                {
+
+                    quoted:
+                        msg
+
+                }
+
+            );
+
         }
 
+
         try {
-            await sock.sendMessage(chatId, {
-                text: `╭─〔 🎵 YOUTUBE MP3 〕
+
+            /* ==========================================
+               SEARCHING UI
+            ========================================== */
+
+            await sock.sendMessage(
+
+                chatId,
+
+                {
+
+                    text:
+
+`╭─〔 🎧 MUSIC PLAYER 〕
 │
-│ 🔎 Searching YouTube...
+│ 🔎 Searching music...
 │
-│ ${query}
+│ 🎵 ${query}
 │
-│ ⏳ Downloading...
+│ ⏳ Please wait...
 │
 ╰───────────────`
-            }, { quoted: msg });
 
-            const result = await getDownload(query, "audio");
-            const file = await downloadBuffer(result.url);
-            const caption = `🎬 *${result.title}*\n\n> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`;
+                },
 
-            return await sock.sendMessage(chatId, {
-                audio: file.buffer,
-                mimetype: result.mimeType || "audio/mpeg",
-                fileName: `${String(result.title).replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "download"}.mp3`,
-                caption
-            }, { quoted: msg });
+                {
+
+                    quoted:
+                        msg
+
+                }
+
+            );
+
+
+            /*
+               ==========================================
+
+               FUTURE DOWNLOAD FLOW
+
+               Query
+                 ↓
+               Search music API
+                 ↓
+               Select first result
+                 ↓
+               Get audio download URL
+                 ↓
+               Send audio to WhatsApp
+
+               ==========================================
+
+               The actual API integration will be
+               connected after we configure the
+               download provider.
+            */
+
+
+            return await sock.sendMessage(
+
+                chatId,
+
+                {
+
+                    text:
+
+`╭─〔 🎵 PLAY RESULT 〕
+│
+│ 🔎 Query:
+│ ${query}
+│
+│ ⚙️ Music engine initialized.
+│
+│ ⏳ Preparing audio service...
+│
+╰───────────────
+
+🤖 ${config.BOT_NAME}`
+
+                },
+
+                {
+
+                    quoted:
+                        msg
+
+                }
+
+            );
+
+
         } catch (error) {
-            console.error("[play COMMAND ERROR]", error.message);
-            return await sock.sendMessage(chatId, {
-                text: `╭─〔 ❌ MP3 ERROR 〕
+
+            console.error(
+
+                "[PLAY COMMAND ERROR]",
+
+                error.message
+
+            );
+
+
+            return await sock.sendMessage(
+
+                chatId,
+
+                {
+
+                    text:
+
+`╭─〔 ❌ PLAY ERROR 〕
+│
+│ Unable to process your request.
 │
 │ ${error.message}
 │
 │ Please try again later.
 │
 ╰───────────────`
-            }, { quoted: msg });
+
+                },
+
+                {
+
+                    quoted:
+                        msg
+
+                }
+
+            );
+
         }
+
     }
+
 };

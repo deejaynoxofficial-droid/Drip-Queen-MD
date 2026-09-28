@@ -1,65 +1,41 @@
-const config = require("../../config");
-const { getDownload, downloadBuffer } = require("../../lib/ytApi");
+const config = require('../../config');
+const { download, cleanup } = require('../../lib/youtubeMedia');
 
 module.exports = {
-    name: "video",
-    aliases: ["vid", "mp4", "video"],
-    category: "Download",
-    description: "Search and download a video using YT-API",
-    usage: ".video <video name>",
+    name: 'ytmp4',
+    aliases: ['ytvideo', 'youtubevideo', 'youtubevid'],
+    category: 'Download',
+    description: 'Search and download YouTube video',
+    usage: '.ytmp4 <video name or YouTube URL>',
 
     async execute(context) {
         const { sock, msg, args, prefix } = context;
         const chatId = msg.key.remoteJid;
-        const query = args.join(" ").trim();
+        const query = args.join(' ').trim();
 
         if (!query) {
-            return await sock.sendMessage(chatId, {
-                text: `╭─〔 🎬 YOUTUBE MP4 〕
-│
-│ Please enter a song or video name.
-│
-│ Example:
-│ ${prefix}video Burna Boy City Boys
-│
-╰───────────────`
-            }, { quoted: msg });
+            return sock.sendMessage(chatId, { text: `╭─〔 🎬 YOUTUBE MP4 〕\n│\n│ Enter a video name or YouTube URL.\n│\n│ Example:\n│ ${prefix}ytmp4 Burna Boy City Boys\n│\n╰───────────────` }, { quoted: msg });
         }
 
+        await sock.sendMessage(chatId, { text: `╭─〔 🎬 YOUTUBE MP4 〕\n│\n│ 🔎 Searching YouTube...\n│ 🎥 ${query}\n│ ⏳ Downloading...\n│\n╰───────────────` }, { quoted: msg });
+
+        let media;
         try {
+            media = await download(query, 'video');
+            const buffer = await require('fs').promises.readFile(media.path);
             await sock.sendMessage(chatId, {
-                text: `╭─〔 🎬 YOUTUBE MP4 〕
-│
-│ 🔎 Searching YouTube...
-│
-│ ${query}
-│
-│ ⏳ Downloading...
-│
-╰───────────────`
-            }, { quoted: msg });
-
-            const result = await getDownload(query, "video");
-            const file = await downloadBuffer(result.url);
-            const caption = `🎬 *${result.title}*\n\n> ${config.BOT_NAME}\n> Powered by ${config.CREATOR}`;
-
-            return await sock.sendMessage(chatId, {
-                video: file.buffer,
-                mimetype: result.mimeType || "video/mp4",
-                fileName: `${String(result.title).replace(/[^a-zA-Z0-9 _-]/g, "").trim() || "download"}.mp4`,
-                caption
+                video: buffer,
+                mimetype: media.mime,
+                fileName: media.filename,
+                caption: `🎬 ${media.title}\n\n🤖 ${config.BOT_NAME}`
             }, { quoted: msg });
         } catch (error) {
-            console.error("[video COMMAND ERROR]", error.message);
-            return await sock.sendMessage(chatId, {
-                text: `╭─〔 ❌ MP4 ERROR 〕
-│
-│ ${error.message}
-│
-│ Please try again later.
-│
-╰───────────────`
+            console.error('[YTMP4 ERROR]', error.stack || error.message);
+            await sock.sendMessage(chatId, {
+                text: `╭─〔 ❌ MP4 ERROR 〕\n│\n│ ${error.message}\n│\n│ The YouTube downloader retried\n│ multiple compatible clients.\n│\n╰───────────────\n🤖 ${config.BOT_NAME}`
             }, { quoted: msg });
+        } finally {
+            await cleanup(media);
         }
     }
 };
